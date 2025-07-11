@@ -92,28 +92,49 @@ void computePositions(double dt) {
 }
 
 
-void simulate(int dt){
+void simulate(double dt){
 	computeAccelerations();
 	computeVelocities(dt);
 	computePositions(dt);
 	//resolveCollisions();
 }
 
+void logPositions(FILE *fp) {
+    for (int i = 0; i < bodies; i++) {
+        fprintf(fp, "%lf,%lf,%lf", positions[i].x, positions[i].y, positions[i].z);
+        if (i < bodies - 1)
+            fprintf(fp, ",");
+    }
+    fprintf(fp, "\n");
+}
+
+
 int main(int argC,char* argV[])
 {
+        FILE *output = fopen("trajectory.csv", "w");
 	int i,j;
 	
-	if(argC!=2)
+	if(argC!=2) {
 		printf("Usage : %s <file name containing system configuration data>",argV[0]);
-	else{
+		return 1;
+	} else {
 		initiateSystem(argV[1]);
 		printf("Body   :     x              y               z           |           vx              vy              vz   ");
 		for(i=0;i<timeSteps;i++){
 			printf("\nCycle %d\n",i+1);
 			simulate(dt);
+			logPositions(output);
 			for(j=0;j<bodies;j++)
 				printf("Body %d : %lf\t%f\t%lf\t|\t%lf\t%lf\t%lf\n",j+1,positions[j].x,positions[j].y,positions[j].z,velocities[j].x,velocities[j].y,velocities[j].z);
 		}
 	}
+	
+	fclose(output);
+	
+	free(masses);
+	free(positions);
+	free(velocities);
+	free(accelerations);
+
 	return 0;
 }

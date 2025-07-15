@@ -1,13 +1,17 @@
 #include<stdlib.h>
 #include<stdio.h>
 #include<math.h>
+#include<time.h>
 
 typedef struct{
 	double x,y,z;
 }vector;
 
-int bodies, timeSteps;
-double *masses, GravConstant, dt;
+int bodies = 10;
+double GravConstant = 39.47;
+double dt = 0.01;
+int N = 5000; // number of iterations
+double *masses;
 vector *positions, *velocities, *accelerations;
 
 vector addVectors(vector a,vector b){
@@ -32,24 +36,38 @@ double mod(vector a){
 	return sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
 }
 
-void initiateSystem(char* fileName){
-	int i;
-	FILE* fp = fopen(fileName,"r");
+double rand_uniform(unsigned int *seed, double min, double max) {
+    return min + (max - min) * ((double)rand_r(seed) / RAND_MAX);
+}
 
-	fscanf(fp,"%lf%d%d%lf", &GravConstant, &bodies, &timeSteps, &dt);
+void initiateSystem(){
+	int i;
 
 	masses = (double*)malloc(bodies*sizeof(double));
 	positions = (vector*)malloc(bodies*sizeof(vector));
 	velocities = (vector*)malloc(bodies*sizeof(vector));
 	accelerations = (vector*)malloc(bodies*sizeof(vector));
+	
+	for (int i = 0; i < bodies; i++) {
+          unsigned int seed = i; // Deterministic seed per body
 
-	for(i=0;i<bodies;i++){
-		fscanf(fp,"%lf",&masses[i]);
-		fscanf(fp,"%lf%lf%lf",&positions[i].x,&positions[i].y,&positions[i].z);
-		fscanf(fp,"%lf%lf%lf",&velocities[i].x,&velocities[i].y,&velocities[i].z);
-	}
+          positions[i].x = rand_uniform(&seed, -1.0, 1.0);
+          positions[i].y = rand_uniform(&seed, -1.0, 1.0);
+          positions[i].z = rand_uniform(&seed, -1.0, 1.0);
 
-	fclose(fp);
+          velocities[i].x = rand_uniform(&seed, -0.5, 0.5);
+          velocities[i].y = rand_uniform(&seed, -0.5, 0.5);
+          velocities[i].z = rand_uniform(&seed, -0.5, 0.5);
+
+          masses[i] = 1.0; // For simplicity
+
+          // Initialize accelerations to zero
+          accelerations[i].x = 0;
+          accelerations[i].y = 0;
+          accelerations[i].z = 0;
+    }
+	
+	
 }
 
 /*void resolveCollisions(){
@@ -111,22 +129,16 @@ void logPositions(FILE *fp) {
 
 int main(int argC,char* argV[])
 {
-        FILE *output = fopen("trajectory.csv", "w");
 	int i,j;
-	
-	if(argC!=2) {
-		printf("Usage : %s <file name containing system configuration data>",argV[0]);
-		return 1;
-	} else {
-		initiateSystem(argV[1]);
-		printf("Body   :     x              y               z           |           vx              vy              vz   ");
-		for(i=0;i<timeSteps;i++){
+	FILE *output = fopen("trajectory.csv", "w");
+    	initiateSystem(bodies);
+      	printf("Body   :     x              y               z           |       vx              vy              vz   ");
+		for(i=0;i<N;i++){
 			printf("\nCycle %d\n",i+1);
 			simulate(dt);
 			logPositions(output);
-			for(j=0;j<bodies;j++)
-				printf("Body %d : %lf\t%f\t%lf\t|\t%lf\t%lf\t%lf\n",j+1,positions[j].x,positions[j].y,positions[j].z,velocities[j].x,velocities[j].y,velocities[j].z);
-		}
+			/**for(j=0;j<bodies;j++)
+				printf("Body %d : %lf\t%f\t%lf\t|\t%lf\t%lf\t%lf\n",j+1,positions[j].x,positions[j].y,positions[j].z,velocities[j].x,velocities[j].y,velocities[j].z);**/
 	}
 	
 	fclose(output);

@@ -5,7 +5,7 @@
 
 typedef struct{
 	double x,y,z;
-}vector;
+} vector;
 
 int bodies = 10;
 double GravConstant = 39.47;
@@ -65,23 +65,8 @@ void initiateSystem(){
           accelerations[i].x = 0;
           accelerations[i].y = 0;
           accelerations[i].z = 0;
-    }
-	
-	
+        }
 }
-
-/*void resolveCollisions(){
-	int i,j;
-
-	for(i=0;i<bodies-1;i++)
-		for(j=i+1;j<bodies;j++){
-			if(positions[i].x==positions[j].x && positions[i].y==positions[j].y && positions[i].z==positions[j].z){
-				vector temp = velocities[i];
-				velocities[i] = velocities[j];
-				velocities[j] = temp;
-			}
-		}
-}*/
 
 void computeAccelerations(){
 	int i,j;
@@ -99,22 +84,21 @@ void computeAccelerations(){
 	}
 }
 
-void computeVelocities(double dt) {
+void computeVelocities() {
 	for (int i = 0; i < bodies; i++)
 		velocities[i] = addVectors(velocities[i], scaleVector(dt, accelerations[i])); //semi-implicit euler
 }
 
-void computePositions(double dt) {
+void computePositions() {
 	for (int i = 0; i < bodies; i++)
 		positions[i] = addVectors(positions[i], scaleVector(dt, velocities[i])); //semi-implicit euler
 }
 
 
-void simulate(double dt){
+void simulate(){
 	computeAccelerations();
 	computeVelocities(dt);
 	computePositions(dt);
-	//resolveCollisions();
 }
 
 void logPositions(FILE *fp) {

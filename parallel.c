@@ -10,7 +10,7 @@ typedef struct{
 
 MPI_Datatype MPI_VECTOR;
 
-int bodies = 6;
+int bodies = 10;
 double GravConstant = 39.47;
 double dt = 0.01;
 int N = 5000; // number of iterations
@@ -156,7 +156,7 @@ int main (int argc, char *argv[]) {
   FILE *output = NULL;
   
   if(myrank == 0) {
-    output = fopen("parallel_trajectory.csv", "w");
+    output = fopen("trajectory_parallel.csv", "w");
   }
   
   int q = bodies / size;
@@ -187,6 +187,9 @@ int main (int argc, char *argv[]) {
   initiateSystem(local_positions, local_masses, velocities, accelerations, b, start_index);
   MPI_Allgatherv(local_positions, b, MPI_VECTOR, global_positions, recvcounts, displs, MPI_VECTOR, MPI_COMM_WORLD);
   MPI_Allgatherv(local_masses, b, MPI_DOUBLE, global_masses, recvcounts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
+  if (myrank == 0) {
+      logPositions(output, bodies, global_positions);
+    }
   for (int i = 0; i<N; i++) {
     simulate(bodies, b, start_index, dt, global_positions, global_masses, accelerations, velocities, local_positions);
     MPI_Allgatherv(local_positions, b, MPI_VECTOR, global_positions, recvcounts, displs, MPI_VECTOR, MPI_COMM_WORLD);

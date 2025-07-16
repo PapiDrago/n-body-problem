@@ -114,8 +114,9 @@ void logPositions(FILE *fp) {
 int main(int argC,char* argV[])
 {
 	int i,j;
-	FILE *output = fopen("trajectory.csv", "w");
+	FILE *output = fopen("trajectory_serial.csv", "w");
     	initiateSystem(bodies);
+    	logPositions(output);
       	printf("Body   :     x              y               z           |       vx              vy              vz   ");
 		for(i=0;i<N;i++){
 			printf("\nCycle %d\n",i+1);

@@ -10,7 +10,7 @@ typedef struct{
 
 MPI_Datatype MPI_VECTOR;
 
-int bodies = 10;
+int bodies = 6;
 double GravConstant = 39.47;
 double dt = 0.01;
 int N = 5000; // number of iterations
@@ -149,6 +149,9 @@ int main (int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
+  createVectorType();
+  
+  
   
   FILE *output = NULL;
   

@@ -53,7 +53,7 @@ unsigned int global_start_index(int r, int bodies, int rank){
 
 }
 
-void initiateSystem(vector *local_positions, vector *velocities, vector *accelerations, double *local_masses, int n_body, unsigned int start_index){	
+void initiateSystem(vector *local_positions, double *local_masses, vector *velocities, vector *accelerations, int n_body, unsigned int start_index){	
 	for (int i = 0; i < n_body; i++) {
           unsigned int seed = start_index + i;
 
@@ -74,7 +74,7 @@ void initiateSystem(vector *local_positions, vector *velocities, vector *acceler
         }
 }
 
-void computeAccelerations(int bodies, int own_bodies, int start_global_index, vector *global_positions, vector *global_masses, vector *accelerations){
+void computeAccelerations(int bodies, int own_bodies, int start_global_index, vector *global_positions, double *global_masses, vector *accelerations){
 	int i,j;
         const double epsilon = 1e-5;
 	for(i=0;i<own_bodies;i++){
@@ -102,7 +102,7 @@ void computePositions(vector *local_positions, vector *velocities, int own_bodie
 }
 
 
-void simulate(int global_bodies, int own_bodies, unsigned int start_global_index, double dt, vector *global_positions, vector *global_masses, vector *accelerations, vector *velocities, vector *local_positions){
+void simulate(int global_bodies, int own_bodies, unsigned int start_global_index, double dt, vector *global_positions, double *global_masses, vector *accelerations, vector *velocities, vector *local_positions){
 	computeAccelerations(global_bodies, own_bodies, start_global_index, global_positions, global_masses, accelerations);
 	computeVelocities(own_bodies, accelerations, velocities, dt);
 	computePositions(local_positions, velocities, own_bodies, dt);
@@ -153,7 +153,7 @@ int main (int argc, char *argv[]) {
   FILE *output = NULL;
   
   if(myrank == 0) {
-    output = fopen("trajectory.csv", "w");
+    output = fopen("parallel_trajectory.csv", "w");
   }
   
   int q = bodies / size;

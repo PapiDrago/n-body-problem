@@ -7,7 +7,7 @@ typedef struct{
 	double x,y,z;
 } vector;
 
-int bodies = 10;
+//int bodies = 10;
 double GravConstant = 39.47;
 double dt = 0.01;
 int N = 100; // number of iterations
@@ -18,7 +18,7 @@ double rand_uniform(unsigned int *seed, double min, double max) {
     return min + (max - min) * ((double)rand_r(seed) / RAND_MAX); //5+16
 }
 
-void initiateSystem(){
+void initiateSystem(int bodies){
 	int i;
 
 	masses = (double*)malloc(bodies*sizeof(double));
@@ -46,7 +46,7 @@ void initiateSystem(){
         }
 }
 
-void computeAccelerations() {
+void computeAccelerations(int bodies) {
     const double epsilon = 1e-5;
     
     for (int i = 0; i < bodies; i++) {
@@ -75,7 +75,7 @@ void computeAccelerations() {
 }
 
 
-void computeVelocities() {
+void computeVelocities(int bodies) {
 	for (int i = 0; i < bodies; i++) {
 		velocities[i].x = velocities[i].x + dt * accelerations[i].x;
                 velocities[i].y = velocities[i].y + dt * accelerations[i].y;
@@ -83,7 +83,7 @@ void computeVelocities() {
                 }
 }
 
-void computePositions() {
+void computePositions(int bodies) {
 	for (int i = 0; i < bodies; i++) {
 		positions[i].x = positions[i].x + dt * velocities[i].x;
 		positions[i].y = positions[i].y + dt * velocities[i].y;
@@ -92,13 +92,13 @@ void computePositions() {
 }
 
 
-void simulate(){ //195*bodies^2+164*bodies
-	computeAccelerations();//(179+16)*bodies^2
-	computeVelocities(dt); //(66+16)*bodies
-	computePositions(dt); //(66+16)*bodies
+void simulate(int bodies){ //195*bodies^2+164*bodies
+	computeAccelerations(bodies);//(179+16)*bodies^2
+	computeVelocities(bodies); //(66+16)*bodies
+	computePositions(bodies); //(66+16)*bodies
 }
 
-void logPositions(FILE *fp) {
+void logPositions(FILE *fp, int bodies) {
     for (int i = 0; i < bodies; i++) {
         fprintf(fp, "%lf,%lf,%lf", positions[i].x, positions[i].y, positions[i].z);
         if (i < bodies - 1)
@@ -108,22 +108,36 @@ void logPositions(FILE *fp) {
 }
 
 
-int main(int argC,char* argV[])
+int main(int argc,char* argv[])
 {
+  int bodies;
+  if (argc > 1) {
+        bodies = atoi(argv[1]);  // Convert the first argument to an int
+        if (bodies <= 0) {
+            fprintf(stderr, "Error: number of bodies must be a positive integer.\n");
+            return 1;
+        }
+  } else {
+        bodies = 10;  // Default value
+        printf("No argument provided. Using default: %d bodies.\n", bodies);
+    }
 	int i,j;
 	FILE *output = fopen("trajectory_serial.csv", "w");
+	//clock_t start = clock();  // Start timing here
     	initiateSystem(bodies); //286*bodies
-    	logPositions(output);
+    	logPositions(output, bodies);
       	printf("Body   :     x              y               z           |       vx              vy              vz   ");
 		for(i=0;i<N;i++){//195*T*bodies^2+164*T*bodies
 			printf("\nCycle %d\n",i+1);
-			simulate(dt); //195*bodies^2+164*bodies
-			logPositions(output);
+			simulate(bodies); //195*bodies^2+164*bodies
+			logPositions(output, bodies);
 			/**for(j=0;j<bodies;j++)
 				printf("Body %d : %lf\t%f\t%lf\t|\t%lf\t%lf\t%lf\n",j+1,positions[j].x,positions[j].y,positions[j].z,velocities[j].x,velocities[j].y,velocities[j].z);**/
 	}
-	
-	fclose(output);
+	//clock_t end = clock();    // Stop timing here
+	//double elapsed_time = (double)(end - start) / CLOCKS_PER_SEC;
+	//printf("Total time: %.6f seconds, Bodies: %d\n", elapsed_time, bodies);
+	//fclose(output);
 	
 	free(masses);
 	free(positions);

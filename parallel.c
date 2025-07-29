@@ -10,34 +10,12 @@ typedef struct{
 
 MPI_Datatype MPI_VECTOR;
 
-int bodies = 10;
+//int bodies = 100;
 double GravConstant = 39.47;
 double dt = 0.01;
-int N = 5000; // number of iterations
+int N = 100; // number of iterations
 double *masses;
 vector *positions, *velocities, *accelerations;
-
-vector addVectors(vector a,vector b){
-	vector c = {a.x+b.x,a.y+b.y,a.z+b.z};
-
-	return c;
-}
-
-vector scaleVector(double b,vector a){
-	vector c = {b*a.x,b*a.y,b*a.z};
-
-	return c;
-}
-
-vector subtractVectors(vector a,vector b){
-	vector c = {a.x-b.x,a.y-b.y,a.z-b.z};
-
-	return c;
-}
-
-double mod(vector a){
-	return sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
-}
 
 double rand_uniform(unsigned int *seed, double min, double max) {
     return min + (max - min) * ((double)rand_r(seed) / RAND_MAX);
@@ -84,21 +62,39 @@ void computeAccelerations(int bodies, int own_bodies, int start_global_index, ve
 		for(j=0;j<bodies;j++){
 		        unsigned int global_index = start_global_index + i;
 			if(global_index!=j){
-			        double dist = mod(subtractVectors(global_positions[global_index], global_positions[j])) + epsilon;
-				accelerations[i] = addVectors(accelerations[i],scaleVector(GravConstant*global_masses[j]/pow(dist,3), subtractVectors(global_positions[j],global_positions[global_index])));
+				
+				double dx = global_positions[j].x - global_positions[global_index].x;
+				double dy = global_positions[j].y - global_positions[global_index].y;
+				double dz = global_positions[j].z - global_positions[global_index].z;
+
+				double dist = sqrt(dx * dx + dy * dy + dz * dz) + epsilon;
+
+				double invDistCubed = 1.0 / (dist * dist * dist);
+
+				double scalar = GravConstant * global_masses[j] * invDistCubed;
+
+				accelerations[i].x += scalar * dx;
+				accelerations[i].y += scalar * dy;
+				accelerations[i].z += scalar * dz;
 			}
 		}
 	}
 }
 
 void computeVelocities(int own_bodies, vector *accelerations, vector *velocities, double dt) {
-	for (int i = 0; i < own_bodies; i++)
-		velocities[i] = addVectors(velocities[i], scaleVector(dt, accelerations[i])); //semi-implicit euler
+	for (int i = 0; i < own_bodies; i++) {
+		velocities[i].x = velocities[i].x + dt * accelerations[i].x;
+                velocities[i].y = velocities[i].y + dt * accelerations[i].y;
+                velocities[i].z = velocities[i].z + dt * accelerations[i].z;
+                }
 }
 
 void computePositions(vector *local_positions, vector *velocities, int own_bodies, double dt) {
-	for (int i = 0; i < own_bodies; i++)
-		local_positions[i] = addVectors(local_positions[i], scaleVector(dt, velocities[i])); //semi-implicit euler
+	for (int i = 0; i < own_bodies; i++) {
+		local_positions[i].x = local_positions[i].x + dt * velocities[i].x;
+		local_positions[i].y = local_positions[i].y + dt * velocities[i].y;
+		local_positions[i].z = local_positions[i].z + dt * velocities[i].z;
+		}
 }
 
 
@@ -154,6 +150,21 @@ int main (int argc, char *argv[]) {
   
   
   FILE *output = NULL;
+  
+  int bodies;
+  if (argc > 1) {
+        bodies = atoi(argv[1]);  // Convert the first argument to an int
+        if (bodies <= 0) {
+            fprintf(stderr, "Error: number of bodies must be a positive integer.\n");
+            return 1;
+        }
+  } else {
+        bodies = 10;  // Default value
+        printf("No argument provided. Using default: %d bodies.\n", bodies);
+    }
+  
+  
+  
   
   if(myrank == 0) {
     output = fopen("trajectory_parallel.csv", "w");

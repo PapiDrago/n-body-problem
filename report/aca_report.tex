@@ -1,23 +1,64 @@
-\documentclass{article}
+\documentclass[a4paper, titlepage]{article}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
-
-\title{Scalability and Communication Overhead in Distributed N-Body Simulation using MPI on GCP}
-\author{Claudio Guarrasi}
-\date{\today}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{titling}
 
 
 \graphicspath{{figures/}}
+
+
+
+
+\title{\textbf{Scalability and Communication Overhead in Distributed N-Body Simulation using MPI on GCP}}
+\author{Claudio Guarrasi\\[1ex]
+	\small{Department of Electrical, Computer and Biomedical Engineering}\\
+	\small{University of Pavia}\\[1ex]
+	\small{Email: \href{mailto:claudio.guarrasi01@universitadipavia.it}{claudio.guarrasi01@universitadipavia.it}}\\
+	\small{GitHub: \href{https://github.com/PapiDrago/n-body-problem}{\underline{https://github.com/PapiDrago/n-body-problem}}}}
+\date{\today}
+
+
+% Subtitle above title (use \pretitle)
+\pretitle{%
+  \begin{center}
+  	\vspace{-12cm} %vertical distance between upper margin and the logo. A negative value means that I am trying to get them closer.
+  	\hspace*{0.1cm} %moving it on the right-
+    \includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}\\[0.3cm]
+    \textit{Advanced Computer Architecture}\\[1ex]
+    \Large  % Switch to large font for the title
+}
+\posttitle{\end{center}}  % Close centering.
+
 \begin{document}
-\begin{figure}[!t]
-    \centering
-    \vspace*{-3cm}
-    \includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}\vspace*{-1.6cm}
-\end{figure}
+\begin{titlingpage}
+%\setlength{\droptitle}{30pt} %lower the title
+
+
+%\begin{center}
+	%\vspace*{-3cm}
+%	\includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}
+%\end{center}
+%\maketitle
 
 
 
-\maketitle
+%\begin{figure}[!t]
+%    \centering
+%    \vspace*{-3cm}
+%    \includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}\vspace*{-1.6cm}
+%\end{figure}
+
+
+
+\maketitle %thanks to 'titling' package, this command generates also the 'pretitle' and put it before the title (it was overwritten in the package)
+
+\begin{abstract}
+This is the abstract body.
+\end{abstract}
+
+\end{titlingpage}
 
 \section{Introduction}
 

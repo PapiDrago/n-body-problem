@@ -1,67 +1,81 @@
-\documentclass[a4paper, titlepage]{article}
+\documentclass{article}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
+\usepackage{multicol}
 \usepackage{amsmath}
-\usepackage{hyperref}
 \usepackage{titling}
+\usepackage[top=2cm,
+    		bottom=2cm,
+    		left=2cm,
+    		right=2cm]{geometry}
+\usepackage{hyperref}
 
 
 \graphicspath{{figures/}}
 
 
 
-
-\title{\textbf{Scalability and Communication Overhead in Distributed N-Body Simulation using MPI on GCP}}
-\author{Claudio Guarrasi\\[1ex]
-	\small{Department of Electrical, Computer and Biomedical Engineering}\\
-	\small{University of Pavia}\\[1ex]
-	\small{Email: \href{mailto:claudio.guarrasi01@universitadipavia.it}{claudio.guarrasi01@universitadipavia.it}}\\
-	\small{GitHub: \href{https://github.com/PapiDrago/n-body-problem}{\underline{https://github.com/PapiDrago/n-body-problem}}}}
-\date{\today}
+\title{\textbf{Scalability and Communication Overhead in Distributed N-Body Simulation using MPI on GCP}\\}
+\author{Claudio Guarrasi\\[1ex]}
+\date{%
+	\today
+	\vspace{-0.25cm}
+	\\
+	\rule{\textwidth}{0.3pt}}
 
 
 % Subtitle above title (use \pretitle)
 \pretitle{%
   \begin{center}
-  	\vspace{-12cm} %vertical distance between upper margin and the logo. A negative value means that I am trying to get them closer.
+  	\vspace{-5cm} %vertical distance between upper margin and the logo. A negative value means that I am trying to get them closer.
   	\hspace*{0.1cm} %moving it on the right-
-    \includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}\\[0.3cm]
+    \includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}					\rule{\textwidth}{0.3pt}
     \textit{Advanced Computer Architecture}\\[1ex]
     \Large  % Switch to large font for the title
 }
-\posttitle{\end{center}}  % Close centering.
+\posttitle{%
+	\end{center} % Close centering.
+	}
+
+\preauthor{\begin{center}}
+\postauthor{%
+	\small{Department of Electrical, Computer and Biomedical Engineering}\\
+	\small{University of Pavia}\\[1ex]
+	\small{Email: \href{mailto:claudio.guarrasi01@universitadipavia.it}{claudio.guarrasi01@universitadipavia.it}}\\
+	\small{GitHub: \href{https://github.com/PapiDrago/n-body-problem}{\underline{https://github.com/PapiDrago/n-body-problem}}}
+	\end{center}}
 
 \begin{document}
 \begin{titlingpage}
-%\setlength{\droptitle}{30pt} %lower the title
-
-
-%\begin{center}
-	%\vspace*{-3cm}
-%	\includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}
-%\end{center}
-%\maketitle
+	
 
 
 
-%\begin{figure}[!t]
-%    \centering
-%    \vspace*{-3cm}
-%    \includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}\vspace*{-1.6cm}
-%\end{figure}
+\maketitle %thanks to 'titling' package, this command generates also the 'pretitle' and 'posttitle', the 'preauthor' and 'postauthor' and the 'predate' and 'postdate' and put them in the following order: {\pretitle, \title, \posttitle, \preauthor, \author, \postauthor, \predate, \date, \postdate} (\maketitle has been overwritten in the package)
+\thispagestyle{empty} % It goes after \maketitle and not after \begin{titlingpage} because \maketitle creates a new page and reset that setting.
 
+	\begin{multicols*}{2}
 
-
-\maketitle %thanks to 'titling' package, this command generates also the 'pretitle' and put it before the title (it was overwritten in the package)
-
-\begin{abstract}
-This is the abstract body.
-\end{abstract}
-
+		\begin{abstract}
+			\centering
+			\noindent
+			This is the abstract body. I hope it will not bee too long, since I would like it to fit in this page. I should be able to achieve it.
+		\end{abstract}
+	\newcolumn
+		\centering
+		\noindent
+		\tableofcontents
+	\end{multicols*}
 \end{titlingpage}
+\thispagestyle{plain}
+%\pagenumbering{arabic}
+
+\begin{multicols}{2}
 
 \section{Introduction}
 
 This is my first LaTeX document compiled with \TeX Live{} using \textbf{TeXmaker}!
 
+
+\end{multicols}
 \end{document}

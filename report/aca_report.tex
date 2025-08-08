@@ -27,7 +27,7 @@
 % Subtitle above title (use \pretitle)
 \pretitle{%
   \begin{center}
-  	\vspace{-5cm} %vertical distance between upper margin and the logo. A negative value means that I am trying to get them closer.
+  	\vspace{-3cm} %vertical distance between upper margin and the logo. A negative value means that I am trying to get them closer.
   	\hspace*{0.1cm} %moving it on the right-
     \includegraphics[width=0.3\textwidth]{black_unipv_logo_caption_below.png}					\rule{\textwidth}{0.3pt}
     \textit{Advanced Computer Architecture}\\[1ex]
@@ -45,11 +45,13 @@
 	\small{GitHub: \href{https://github.com/PapiDrago/n-body-problem}{\underline{https://github.com/PapiDrago/n-body-problem}}}
 	\end{center}}
 
+
+
+
+
+
 \begin{document}
 \begin{titlingpage}
-	
-
-
 
 \maketitle %thanks to 'titling' package, this command generates also the 'pretitle' and 'posttitle', the 'preauthor' and 'postauthor' and the 'predate' and 'postdate' and put them in the following order: {\pretitle, \title, \posttitle, \preauthor, \author, \postauthor, \predate, \date, \postdate} (\maketitle has been overwritten in the package)
 \thispagestyle{empty} % It goes after \maketitle and not after \begin{titlingpage} because \maketitle creates a new page and reset that setting.
@@ -59,7 +61,7 @@
 		\begin{abstract}
 			\centering
 			\noindent
-			This is the abstract body. I hope it will not bee too long, since I would like it to fit in this page. I should be able to achieve it.
+			This report presents a comprehensive overview of the methods, challenges, and potential solutions involved in the development of a modern technical system. The work includes an analysis of the underlying concepts, a review of relevant literature, and an evaluation of current approaches. Emphasis is placed on both theoretical foundations and practical implementation strategies. The results obtained highlight the effectiveness of the chosen methodology and provide a solid basis for future research or application. This abstract serves as a placeholder and should be replaced with a summary specific to the final version of the report.
 		\end{abstract}
 	\newcolumn
 		\centering
@@ -67,15 +69,49 @@
 		\tableofcontents
 	\end{multicols*}
 \end{titlingpage}
+
 \thispagestyle{plain}
 %\pagenumbering{arabic}
 
-\begin{multicols}{2}
+\twocolumn
 
 \section{Introduction}
+The N-body problem is a well-known problem in physics and it has several applications ranging from modeling the gravitational interactions in galaxies and solar systems to simulating charged particle dynamics in plasmas and atoms in molecular systems.
 
-This is my first LaTeX document compiled with \TeX Live{} using \textbf{TeXmaker}!
+Depending on the goal of the analysis, various assumptions can be relaxed or adjusted. In the experiments I conducted, I considered a closed system of $N$ point masses interacting solely through gravitational forces. This assumption is quite reasonable when modeling astronomical systems, especially when the goal is to compute the trajectories of celestial bodies within them. In such systems, the gravitational force dominates due to the extremely large masses involved, allowing other forces to be safely neglected.
+
+Numerous algorithmic solutions have been proposed to address the N-body problem, many of which have been implemented in software to automate the computation of relevant physical quantities.
+
+This work does not aim to propose a new or improved algorithmic solution. Instead, given an existing approach, the focus is on developing a parallel implementation that highlights the complexities involved in distributing the computation and evaluates its performance in a distributed environment.
+
+Essentially the objectives of this work were:
+\begin{enumerate}
+\item to analyze a possible serial algorithm for solving the N-body problem;
+\item to perform an \emph{a priori} study of the available parallelism using Amdahl's Law;
+\item to develop a parallel implementation using the Message Passing Interface (MPI);
+\item to evaluate performance and scalability through experiments conducted on Google Cloud Platform (GCP).
+\end{enumerate}
+
+\section{Physical model}
+In order to understand the algorithm it is important to recall what are the physics laws which describe our model.
+\begin{itemize}
+\item Newton's law of universal gravitation:
+\begin{equation}
+\vec{F}_{i,j}=G\frac{m_{i} m_{j}}{\|\vec{r}_{i}-\vec{r}_{j}\|^3}(\vec{r}_{j}-\vec{r}_{i})
+\end{equation}
+\begin{description}
+    \item[\( G \)] Gravitational constant.
+    \item[\( m_i, m_j \)] Masses of bodies \( i \) and \( j \).
+    \item[\( \vec{r}_i, \vec{r}_j \)] Position vectors of bodies \( i \) and \( j \).
+    \item[\( \vec{F}_{i,j} \)] Force acting on body \( i \) due to body \( j \).
+\end{description}
+Please notice that $\vec{F}_{i,j}$ is an attractive force that has the same direction of the distance vector \mbox{$(\vec{r}_j - \vec{r}_i)$}.
+\item Newton's second law of motion:
+\begin{equation}
+
+\end{equation}
+\end{itemize}
 
 
-\end{multicols}
+
 \end{document}

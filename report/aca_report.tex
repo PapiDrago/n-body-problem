@@ -92,12 +92,13 @@ Essentially the objectives of this work were:
 \item to evaluate performance and scalability through experiments conducted on Google Cloud Platform (GCP).
 \end{enumerate}
 
-\section{Physical model}
-In order to understand the algorithm it is important to recall what are the physics laws which describe our model.
+\section{Physical Model}
+In order to understand the algorithm it is important to recall the physics laws on which the model is based.
 \begin{itemize}
 \item Newton's law of universal gravitation:
 \begin{equation}
 \vec{F}_{i,j}=G\frac{m_{i} m_{j}}{\|\vec{r}_{i}-\vec{r}_{j}\|^3}(\vec{r}_{j}-\vec{r}_{i})
+\label{eq:gravitation}
 \end{equation}
 \begin{description}
     \item[\( G \)] Gravitational constant.
@@ -105,13 +106,54 @@ In order to understand the algorithm it is important to recall what are the phys
     \item[\( \vec{r}_i, \vec{r}_j \)] Position vectors of bodies \( i \) and \( j \).
     \item[\( \vec{F}_{i,j} \)] Force acting on body \( i \) due to body \( j \).
 \end{description}
-Please notice that $\vec{F}_{i,j}$ is an attractive force that has the same direction of the distance vector \mbox{$(\vec{r}_j - \vec{r}_i)$}.
+Please note that $\vec{F}_{i,j}$ is an attractive force that has the same direction of the displacement vector \mbox{$(\vec{r}_j - \vec{r}_i)$}.
 \item Newton's second law of motion:
 \begin{equation}
-
+\Sigma\vec{F} = m\vec{a}
+\label{eq:motion}
 \end{equation}
+It states that the sum of all the forces $\Sigma\vec{F}$ acting on a particular point mass is equal to the product between its mass $m$ and its acceleration $\vec{a}$.
 \end{itemize}
+In our scenario we can combine~\eqref{eq:gravitation} and~\eqref{eq:motion} to obtain, at a certain time instant, the acceleration $\vec{a}_i$ of point mass $m_i$ implied by all the gravitational forces acting on that point mass. Analytically we can write:
+\begin{equation}
+\vec{a}_i=\sum_{\substack{j=0 \\ j \neq i}}^{N-1}\left[G\frac{m_j}{\|\vec{r}_i-\vec{r}_j\|^3}(\vec{r}_j-\vec{r}_i)\right]
+\label{eq:acceleration}
+\end{equation}
+Since we are ultimately interested in the trajectory of each body, from $\vec{a}_i$ we can compute the velocity $\vec{v}_i$ and the position $\vec{r}_i$ of mass $i$ by simply integrating $\vec{a}_i$ with respect to time.
+\begin{equation}
+\vec{v}_i(t_k) = \vec{v}_i(t_{k-1}) + \int_{t_{k-1}}^{t_k} \vec{a}_i(\tau)\, d\tau
+\label{eq:continuous_v}
+\end{equation}
+\begin{equation}
+\vec{r}_i(t_k) = \vec{r}_i(t_{k-1}) + \int_{t_{k-1}}^{t_k} \vec{v}_i(\tau)\, d\tau
+\label{eq:continuous_r}
+\end{equation}
+\begin{description}
+\item $t_{k-1}$ Time instant defining the initial condition for the current time step.
+\end{description}
+Although the notation $t_k$ and $t_{k-1}$ may initially appear cumbersome, it will prove useful later when expressing the iterative numerical formulation of the problem.
+\subsection{Iterative Nature of the N-body Solution}
+It is important to note that for systems involving more than two bodies (\( N > 2 \)), the N-body problem does not admit a general closed-form solution. This means that it is not possible to determine the complete trajectories of all bodies analytically from the initial conditions alone.
 
+In the special case \( N = 2 \), the problem can be reduced to a one-body system by moving to the center-of-mass reference frame. In this frame, the motion can be fully described using relative coordinates, and a closed-form analytical solution can be derived for the position and velocity of each body. However, as soon as a third body is introduced, the system becomes non-linear and highly sensitive to initial conditions, making analytical solutions intractable in the general case~\cite{heggie2005classical}.
 
+For this reason to compute the position of one particular mass at time $k$ it is necessary to iteratively solve the equations of motion (\eqref{eq:acceleration},\eqref{eq:continuous_v},\eqref{eq:continuous_r}) for all the $N$ bodies at each time step $t \leq k$. This is required because, as shown in \eqref{eq:acceleration}, the acceleration at time $k$ depends on the positions of all the bodies at that time.
+Just from this consideration we can already anticipate the high computational cost.
 
+\subsection{Numerical Integration}
+At each step we have to carry out numerical integration. To be more precise numerical integration means to solve a first-order differential equation (ODE). In continuous time domain it consists in solving the following problem (to be more concise it will be shown it for the velocity magnitude $v$ only):
+\begin{equation} % '&' is used as alignment point.
+\left\{
+\begin{aligned}
+\frac{dv}{dt} &= f(v, t) \\
+v_0 &= v(t_0)
+\end{aligned}
+\right.
+\end{equation}
+\begin{description}
+\item $v_0$ is the known velocity at time $t_0$.
+\item $f(v,t)$ is the right-end term in \eqref{eq:acceleration}.
+\end{description}
+\bibliographystyle{IEEEtran} %I had to install a package through the package manager to use 'IEEEtran'.
+\bibliography{refs} 
 \end{document}

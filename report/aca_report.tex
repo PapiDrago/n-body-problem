@@ -76,6 +76,7 @@
 \twocolumn
 
 \section{Introduction}
+\label{sec:intro}
 The N-body problem is a well-known problem in physics and it has several applications ranging from modeling the gravitational interactions in galaxies and solar systems to simulating charged particle dynamics in plasmas and atoms in molecular systems.
 
 Depending on the goal of the analysis, various assumptions can be relaxed or adjusted. In the experiments I conducted, I considered a closed system of $N$ point masses interacting solely through gravitational forces. This assumption is quite reasonable when modeling astronomical systems, especially when the goal is to compute the trajectories of celestial bodies within them. In such systems, the gravitational force dominates due to the extremely large masses involved, allowing other forces to be safely neglected.
@@ -114,7 +115,7 @@ Please note that $\vec{F}_{i,j}$ is an attractive force that has the same direct
 \end{equation}
 It states that the sum of all the forces $\Sigma\vec{F}$ acting on a particular point mass is equal to the product between its mass $m$ and its acceleration $\vec{a}$.
 \end{itemize}
-In our scenario we can combine~\eqref{eq:gravitation} and~\eqref{eq:motion} to obtain, at a certain time instant, the acceleration $\vec{a}_i$ of point mass $m_i$ implied by all the gravitational forces acting on that point mass. Analytically we can write:
+In our scenario we can combine~\eqref{eq:gravitation} and~\eqref{eq:motion} to obtain, at a certain time instant, the acceleration $\vec{a}_i$ of point mass $i$ implied by all the gravitational forces acting on that point mass. Analytically we can write:
 \begin{equation}
 \vec{a}_i=\sum_{\substack{j=0 \\ j \neq i}}^{N-1}\left[G\frac{m_j}{\|\vec{r}_i-\vec{r}_j\|^3}(\vec{r}_j-\vec{r}_i)\right]
 \label{eq:acceleration}
@@ -141,19 +142,67 @@ For this reason to compute the position of one particular mass at time $k$ it is
 Just from this consideration we can already anticipate the high computational cost.
 
 \subsection{Numerical Integration}
-At each step we have to carry out numerical integration. To be more precise numerical integration means to solve a first-order differential equation (ODE). In continuous time domain it consists in solving the following problem (to be more concise it will be shown it for the velocity magnitude $v$ only):
+At each simulation step, we must numerically integrate the equations of motion in order to update the velocity and position of all bodies. In the continuous-time domain, this corresponds to evaluating \eqref{eq:continuous_v} and \eqref{eq:continuous_r}.
+
+However, in practice a digital computer can only work with discrete time instants due to its inherent limitations: it operates at a finite clock frequency, stores only a finite number of samples in memory, and uses finite-precision arithmetic. As a result, we reformulate the problem in the discrete-time domain.
+
+For convenience, the vector notation is omitted here. The time-discretized velocity update equation can be expressed as:
 \begin{equation} % '&' is used as alignment point.
 \left\{
 \begin{aligned}
-\frac{dv}{dt} &= f(v, t) \\
-v_0 &= v(t_0)
+\frac{v_{k+1}-v_k}{\Delta t} &= a_k(r_k, k) \\
+v_k &=v(k \Delta t)
 \end{aligned}
 \right.
 \end{equation}
 \begin{description}
-\item $v_0$ is the known velocity at time $t_0$.
-\item $f(v,t)$ is the right-end term in \eqref{eq:acceleration}.
+\item[$v_k$] Velocity at time $t_k$, with $t_k = k \, \Delta t$.
+\item[$a_k(r_k, k)$] Acceleration at step $k$, computed from \eqref{eq:acceleration}.
+\item[$\Delta t$] Step size between two consecutive time instants.
 \end{description}
+With some little algebraic manipulations we can obtain:
+\begin{equation}
+v_{k+1}=v_k+a_k\Delta t
+\label{eq:v_explicit_euler}
+\end{equation}
+Similarly, the position update is:
+\begin{equation}
+r_{k+1}=r_k+v_k\Delta t
+\label{eq:r_explicit_euler}
+\end{equation}
+Incidentally, we expressed position and velocity using the explicit Euler method~\cite{atkinson1989introduction}.
+
+However, not all numerical integration methods are equally suitable when simulating physical systems on a computer. This can be seen by writing the exact velocity at time step $k+1$ using the Taylor expansion with Lagrange remainder:
+\begin{equation}
+\begin{aligned}
+v(t_k+\Delta t) = v(t_k) + a(&t_k)\,\Delta t
++ \frac{\Delta t^2}{2} \frac{d^2 v}{dt^2}(\xi), \\
+&\qquad \xi \in \left[ t_k,\, t_k+\Delta t \right]
+\end{aligned}
+\label{eq:v_taylor}
+\end{equation}
+Neglecting the second-order term yields \eqref{eq:v_explicit_euler}. This highlights that any numerical integration method produces an approximation, and in the case of explicit Euler, the local truncation error is proportional to $\Delta t^2$.
+
+Choosing a very small $\Delta t$ reduces the error but increases the computational cost.
+For example, if $\Delta t = 0.01\,\text{s}$, simulating one second of motion requires $100$ iterations of the solution algorithm, whereas with $\Delta t = 0.1\,\text{s}$, only $10$ iterations are needed.
+
+It also crucial to address the fact that, iteration after iteration, the numerical error accumulates, bringing the computed velocity to deviate more and more from the true value, which in turn causes the total energy of the simulated system to drift, violating the thermodynamical principle of energy conservation.
+For the N-Body system described in section~\ref{sec:intro}, this can be seen by considering the total kinetic energy $K_{\text{TOT}}$ of the system at time step $k$:
+\begin{equation}
+K_{TOT}(k) = \frac{1}{2} \sum_{i=0}^{N-1}m_iv_i^2(k)
+\end{equation}
+Since the system is closed, this quantity should remain constant during the simulation. However, due to the impossibility of computing the exact velocities, this condition cannot be perfectly satisfied.
+What can be done instead is to bound the energy oscillations around the true value.
+It can be proven that a \emph{symplectic} numerical methods allows us to achieve this~\cite{ENGLE2005432}.
+
+It is for this reason that I chose to pick for my project the \emph{semi-implicit Euler} integration method, which is symplectic \cite{cioaca2013impactexplicitsemiimplicitintegration}, and very similar to explicit Euler method. The only difference is that to compute the position at time step $k+1$ we use the updated velocity $v_{k+1}$ and not the velocity at the previous time step $k$ as seen in \ref{eq:v_explicit_euler}:
+\begin{equation}
+r_{k+1}=r_k+v_{k+1} \, \Delta t
+\label{eq:v_semi_implicit}
+\end{equation}
+
+\section{Serial Algorithm}
+
 \bibliographystyle{IEEEtran} %I had to install a package through the package manager to use 'IEEEtran'.
 \bibliography{refs} 
 \end{document}

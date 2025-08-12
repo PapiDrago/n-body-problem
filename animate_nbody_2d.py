@@ -13,10 +13,10 @@ positions -= positions[:, 0:1, :]
 
 # Plot setup
 fig, ax = plt.subplots()
-colors = ['orange'] + ['blue'] * (N - 1)
-sizes = [80] + [20] * (N - 1)
-#colors = ['orange', 'gray', 'yellow', 'blue', 'red', 'brown', 'gold', 'cyan', 'navy', 'darkred']
-#sizes = [100, 5, 6, 8, 6, 40, 35, 25, 24, 3]
+#colors = ['orange'] + ['blue'] * (N - 1) # to be commented out when not simulating the solar system
+#sizes = [80] + [20] * (N - 1)		 # to be commented out when not simulating the solar system
+colors = ['orange', 'gray', 'yellow', 'blue', 'red', 'brown', 'gold', 'cyan', 'navy', 'darkred']
+sizes = [100, 5, 6, 8, 6, 40, 35, 25, 24, 3]
 
 # Initial positions
 x0 = positions[0, :, 0]

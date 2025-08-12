@@ -8,6 +8,7 @@
     		bottom=2cm,
     		left=2cm,
     		right=2cm]{geometry}
+\usepackage{algorithm, algpseudocode} % Do not put both alhpseudocode and algorithmic because ovewrite the same command.
 \usepackage{hyperref}
 
 
@@ -202,7 +203,80 @@ r_{k+1}=r_k+v_{k+1} \, \Delta t
 \end{equation}
 
 \section{Serial Algorithm}
+In the literature~\cite{heggie2005classical}, several approaches have been proposed to address the N-body problem, each with different computational complexities and levels of approximation.  
+In this project, the \emph{direct method} was chosen, as it most closely reflects the conceptual formulation of the problem without making further approximations.
 
+Algorithm~\ref{alg:serial} shows the basic structure of the direct method: initially all the $N$ bodies are initialized. Each of them has mass, a starting position and a starting velocity. Then, for each simulation step, the kinematic quantities are updated. 
+
+\begin{algorithm}[H]
+\caption{Serial N-body algorithm (direct method)}
+\label{alg:serial}
+\begin{algorithmic}[1]
+\State Initialize positions, velocities, and masses
+\For{each time step}
+    \State Compute accelerations (Algorithm~\ref{alg:inner_loop})
+    \State Update velocities
+    \State Update positions
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Complexity Analysis}
+
+\subsubsection{Time Complexity}
+The overall time complexity is dominated by the \emph{Compute accelerations} algorithm~\ref{alg:inner_loop}, since the other components of the serial algorithm involve only a single loop over the $N$ bodies ($N$ is the problem size). In contrast, the \emph{Compute accelerations} step contains a nested loop that also iterates over all $N$ bodies (in practice $N-1$, which is asymptotically equivalent to $N$). 
+
+More precisely, the actual computational cost also depends on the number of time steps $T$ in the simulation, leading to a total complexity of $O(T N^2)$.
+
+Since in the experiments conducted $N \gg T$, the factor $T$ will be omitted from the complexity expressions in the remainder of this work.
+
+\begin{algorithm}
+\caption{Inner loop: compute accelerations (direct method)}
+\label{alg:inner_loop}
+\begin{algorithmic}[1]
+\Require Positions $\{\vec r_j\}_{j=0}^{N-1}$, masses $\{m_j\}_{j=0}^{N-1}$
+\Ensure Accelerations $\{\vec a_i\}_{i=0}^{N-1}$
+\For{$i \gets 0$ to $N-1$}
+  \State $\vec a_i \gets (0,0,0)$
+  \For{$j \gets 0$ to $N-1$}
+    \If{$j \neq i$}
+      \State $\vec d \gets \vec r_j - \vec r_i$
+      \State $R^3 \gets \|\vec d\|^3 $
+      \State $invR^3 \gets 1 /R^3$
+      \State $\vec a_i \gets \vec a_i + G \, m_j \, invR^3 \, \vec d$
+    \EndIf
+  \EndFor
+\EndFor
+\Statex \textbf{Time complexity:} $O(N^2)$
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Space Complexity}
+The serial algorithm requires storing the masses, the positions, the velocities and the accelerations of the $N$ bodies. Since the kinematic quantities are 3D vectors, each elements corresponds to 3 floating-point values.
+This means the total storage is:
+
+This means the total storage is: %aligne is a math environment
+\begin{align*}
+&N \ \text{masses} + 3N \ \text{positions} + 3N \ \text{velocities} \\
+&\quad + 3N \ \text{accelerations} = 10N \ \text{real values}
+\end{align*}
+
+Asymptotically, this results in a space complexity of $O(N)$.  
+
+On modern general-purpose computers, this is not a limiting factor because several gigabytes of RAM are available. For example, if double precision is used (8 bytes per floating-point number), one million bodies would require:
+\[
+8 \times 10 \times 10^6 = 80 \ \text{MB}
+\]
+which easily fits in memory.
+
+\subsection{Implementation in C}
+The conceptual serial algorithm described in the previous subsection was implemented in the C programming language. This choice was primarily motivated by the need to perform detailed profiling of the code. The complete source code is publicly available on the GitHub repository for this project\footnote{\url{https://github.com/PapiDrago/n-body-problem}, file \emph{serial.c}}.
+
+The implementation follows closely the structure of Algorithm~\ref{alg:serial}, with each major step of the simulation (initialization, acceleration computation, velocity update, and position update) mapped to dedicated functions.
+This modular structure facilitates both readability and profiling, enabling the identification of computational bottlenecks.  
+
+%Passa in rassegna le funzioni sottolineando la struttura del vettore. Da menzionare che all'inizio l'input consisteva nella lettura di un file di testo ciò mi permetteva di forzare arbitrariamente i valori iniziali dei corpi per confermare l'efficacia dell'algoritmo. A proposito l'applicazione seriale stampa al termine di ogni passo della simulazione le coordinate dei corpi. Il file contenenente le coordinate è stato dato a un'app python per avere un'animazione della traiettoria dei corpi in modo tale che tutto torni. Mostra sistema solare e magari anche la maggiore velocità di un corpo quando si avvicina a un corpo più grande. Poi dire perché ho fatto l'inizializzazione a caso. Confermare la time complexity con grafico. Quindi iniziare a discutere il profiling, sottolineare quale sia il bottleneck e ...
+%
 \bibliographystyle{IEEEtran} %I had to install a package through the package manager to use 'IEEEtran'.
 \bibliography{refs} 
 \end{document}

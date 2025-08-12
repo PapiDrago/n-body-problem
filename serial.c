@@ -15,7 +15,7 @@ double *masses;
 vector *positions, *velocities, *accelerations;
 
 double rand_uniform(unsigned int *seed, double min, double max) {
-    return min + (max - min) * ((double)rand_r(seed) / RAND_MAX); //5+16
+    return min + (max - min) * ((double)rand_r(seed) / RAND_MAX);
 }
 
 void initiateSystem(int bodies){
@@ -26,23 +26,23 @@ void initiateSystem(int bodies){
 	velocities = (vector*)malloc(bodies*sizeof(vector));
 	accelerations = (vector*)malloc(bodies*sizeof(vector));
 	
-	for (int i = 0; i < bodies; i++) { //3*bodies
-          unsigned int seed = i; // 1*bodies
+	for (int i = 0; i < bodies; i++) {
+          unsigned int seed = i;
 
-          positions[i].x = rand_uniform(&seed, -1.0, 1.0); // (16+21+3+3)*bodies
-          positions[i].y = rand_uniform(&seed, -1.0, 1.0); // (16+21+3+3)*bodies
-          positions[i].z = rand_uniform(&seed, -1.0, 1.0); // (16+21+3+3)*bodies
+          positions[i].x = rand_uniform(&seed, -1.0, 1.0);
+          positions[i].y = rand_uniform(&seed, -1.0, 1.0);
+          positions[i].z = rand_uniform(&seed, -1.0, 1.0);
 
-          velocities[i].x = rand_uniform(&seed, -0.5, 0.5);// (16+21+3+3)*bodies
-          velocities[i].y = rand_uniform(&seed, -0.5, 0.5);// (16+21+3+3)*bodies
-          velocities[i].z = rand_uniform(&seed, -0.5, 0.5);// (16+21+3+3)*bodies
+          velocities[i].x = rand_uniform(&seed, -0.5, 0.5);
+          velocities[i].y = rand_uniform(&seed, -0.5, 0.5);
+          velocities[i].z = rand_uniform(&seed, -0.5, 0.5);
 
-          masses[i] = 1.0; // For simplicity //(3+3)*bodies
+          masses[i] = 1.0; // For simplicity
 
           // Initialize accelerations to zero
-          accelerations[i].x = 0; //(3+3)*bodies
-          accelerations[i].y = 0; //(3+3)*bodies
-          accelerations[i].z = 0; //(3+3)*bodies
+          accelerations[i].x = 0;
+          accelerations[i].y = 0;
+          accelerations[i].z = 0;
         }
 }
 
@@ -92,10 +92,10 @@ void computePositions(int bodies) {
 }
 
 
-void simulate(int bodies){ //195*bodies^2+164*bodies
-	computeAccelerations(bodies);//(179+16)*bodies^2
-	computeVelocities(bodies); //(66+16)*bodies
-	computePositions(bodies); //(66+16)*bodies
+void simulate(int bodies){
+	computeAccelerations(bodies);
+	computeVelocities(bodies);
+	computePositions(bodies);
 }
 
 void logPositions(FILE *fp, int bodies) {

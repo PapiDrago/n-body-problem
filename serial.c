@@ -124,12 +124,12 @@ int main(int argc,char* argv[])
 	int i,j;
 	FILE *output = fopen("trajectory_serial.csv", "w");
 	//clock_t start = clock();  // Start timing here
-    	initiateSystem(bodies); //286*bodies
+    	initiateSystem(bodies);
     	logPositions(output, bodies);
       	printf("Body   :     x              y               z           |       vx              vy              vz   ");
-		for(i=0;i<N;i++){//195*T*bodies^2+164*T*bodies
+		for(i=0;i<N;i++){
 			printf("\nCycle %d\n",i+1);
-			simulate(bodies); //195*bodies^2+164*bodies
+			simulate(bodies);
 			logPositions(output, bodies);
 			/**for(j=0;j<bodies;j++)
 				printf("Body %d : %lf\t%f\t%lf\t|\t%lf\t%lf\t%lf\n",j+1,positions[j].x,positions[j].y,positions[j].z,velocities[j].x,velocities[j].y,velocities[j].z);**/

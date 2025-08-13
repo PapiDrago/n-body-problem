@@ -9,6 +9,34 @@
     		left=2cm,
     		right=2cm]{geometry}
 \usepackage{algorithm, algpseudocode} % Do not put both alhpseudocode and algorithmic because ovewrite the same command.
+
+\usepackage{booktabs}% for tables
+
+% To gracefully insert code
+\usepackage{listings}
+\usepackage{xcolor} % for colors
+
+\lstset{
+    language=C,                     % set language
+    basicstyle=\ttfamily\small,     % font style
+    numbers=none,
+    %numbers=left,                   % line numbers on the left
+    numberstyle=\tiny,              % line number style
+    stepnumber=1,                   % number every line
+    numbersep=5pt,                  % space between numbers and code
+    backgroundcolor=\color{gray!10},% light gray background
+    keywordstyle=\color{blue},      % keywords in blue
+    commentstyle=\color{green!50!black}, % comments in green
+    stringstyle=\color{red},        % strings in red
+    breaklines=true,                % allow line breaking
+    frame=single,                   % border around code
+    tabsize=4                       % tab size
+}
+%
+
+
+
+
 \usepackage{hyperref}
 
 
@@ -143,6 +171,7 @@ For this reason to compute the position of one particular mass at time $k$ it is
 Just from this consideration we can already anticipate the high computational cost.
 
 \subsection{Numerical Integration}
+\label{subsec:num_int}
 At each simulation step, we must numerically integrate the equations of motion in order to update the velocity and position of all bodies. In the continuous-time domain, this corresponds to evaluating \eqref{eq:continuous_v} and \eqref{eq:continuous_r}.
 
 However, in practice a digital computer can only work with discrete time instants due to its inherent limitations: it operates at a finite clock frequency, stores only a finite number of samples in memory, and uses finite-precision arithmetic. As a result, we reformulate the problem in the discrete-time domain.
@@ -224,6 +253,7 @@ Algorithm~\ref{alg:serial} shows the basic structure of the direct method: initi
 \subsection{Complexity Analysis}
 
 \subsubsection{Time Complexity}
+\label{subsec:time_complexity}
 The overall time complexity is dominated by the \emph{Compute accelerations} algorithm~\ref{alg:inner_loop}, since the other components of the serial algorithm involve only a single loop over the $N$ bodies ($N$ is the problem size). In contrast, the \emph{Compute accelerations} step contains a nested loop that also iterates over all $N$ bodies (in practice $N-1$, which is asymptotically equivalent to $N$). 
 
 More precisely, the actual computational cost also depends on the number of time steps $T$ in the simulation, leading to a total complexity of $O(T N^2)$.
@@ -275,8 +305,284 @@ The conceptual serial algorithm described in the previous subsection was impleme
 The implementation follows closely the structure of Algorithm~\ref{alg:serial}, with each major step of the simulation (initialization, acceleration computation, velocity update, and position update) mapped to dedicated functions.
 This modular structure facilitates both readability and profiling, enabling the identification of computational bottlenecks.  
 
-%Passa in rassegna le funzioni sottolineando la struttura del vettore. Da menzionare che all'inizio l'input consisteva nella lettura di un file di testo ciò mi permetteva di forzare arbitrariamente i valori iniziali dei corpi per confermare l'efficacia dell'algoritmo. A proposito l'applicazione seriale stampa al termine di ogni passo della simulazione le coordinate dei corpi. Il file contenenente le coordinate è stato dato a un'app python per avere un'animazione della traiettoria dei corpi in modo tale che tutto torni. Mostra sistema solare e magari anche la maggiore velocità di un corpo quando si avvicina a un corpo più grande. Poi dire perché ho fatto l'inizializzazione a caso. Confermare la time complexity con grafico. Quindi iniziare a discutere il profiling, sottolineare quale sia il bottleneck e ...
+It is worth noticing that to represent the physical vector has been used a struct called \emph{vector} which has three fields, each one is of type \emph{double} and corresponds to one of the three vector components.
+In addition the serial application, at the end of each simulation step, prints the positions of all the bodies on a text file. This has been done in order to check qualitatively the resuls and to compare them to those of the MPI parallel application.
+
+\subsubsection{Testing}
+Testing was performed qualitatively, leveraging the physical laws embedded in the program’s functions and the results discussed in Subsection~\ref{subsec:num_int} regarding symplectic numerical integrators, which ensure long-term stability of the simulated system.
+
+For this purpose, a slightly modified version of the serial application (\emph{serial\_testing.c}), adapted from~\cite{wiki:n_body}, was used. This variant allows the user to configure simulation parameters, including the number of bodies, the time-step size, and all initial quantities for each body (mass, position, and velocity), via a plain-text input file. The exact file format is documented in the \emph{README.md} of the remote repository.
+
+The application produces an output text file containing the positions of all bodies at each time step. This output was then processed by a Python script (\emph{animate\_nbody\_2d.py}) to generate a 2D animation, enabling a qualitative verification of the trajectories and overall behavior of the simulated system.
+
+Two representative qualitative test cases were examined.  
+In the first case, shown in Figure~\ref{fig:two_body_orbit}, the system consisted of a very massive body placed at the origin and a much lighter body with an initial velocity orthogonal to its initial position vector.  
+The simulation confirmed the expected physical behavior:  
+\begin{itemize}
+    \item the massive body remained essentially stationary due to its large inertia,
+    \item the lighter body followed a closed orbit (elliptical in this specific setup),
+    \item the lighter body’s speed increased when it was closer to the massive body, in agreement with Kepler's second law.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{2_body_orbit.png}
+    \caption{Two-body test: a stationary massive body (orange) and a lighter body (blue) in orbit.}
+    \label{fig:two_body_orbit}
+\end{figure}
+The plot in Figure~\ref{fig:two_body_orbit} was obtained by setting the configuation file read by \emph{serial\_testing.c}, as follows:
+\begin{itemize}
+    \item Body~0 (massive): $m = 1.0$, initial position $(0,0,0)$, initial velocity $(0,0,0)$;
+    \item Body~1 (light): $m = 3\times 10^{-6}$, initial position $(-1,-1,0)$, initial velocity $(0,6,0)$.
+\end{itemize}
+The time step was set to $\Delta t = 0.01$, and the simulation was run for $T=2000$ steps.
+
+A second test was performed using a larger set of bodies, inspired by a simplified solar system model.  
+Figure~\ref{fig:long_solar_system} shows the result of a longer simulation run with $T = 2000$ time steps.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{long_solar_system.png}
+    \caption{Solar system test: all the planets revolves steadily around the central star.}
+    \label{fig:long_solar_system}
+\end{figure}
+Throughout the simulation, no planet escaped its orbit, indicating that the numerical integration preserved stability over time.  
+Moreover, bodies at different distances from the central mass exhibited the expected orbital periods, and gravitational interactions between planets did not cause unphysical divergence.
+
+These qualitative observations confirm that the combination of the direct gravitational computation and the chosen symplectic integrator (\S\ref{subsec:num_int}) yields a physically plausible evolution, even over longer durations.
+  
+The parameters used to produce Figure~\ref{fig:long_solar_system} are reported in Appendix~\ref{appendix:solar_params}.
+
+\subsubsection{Random Initialization}
+The standard version of the serial application initialized the simulated system randomly. This makes simpler doing experiments with a large quantities of bodies: the program receives the number of bodies from the user through the command-line.
+It is worth noticing the use into the inizialization routine of the function \emph{rand\_uniform}.
+\begin{lstlisting}
+double rand_uniform(unsigned int *seed, double min, double max) {
+    return min + (max - min) * ((double)rand_r(seed) / RAND_MAX);
+}
+\end{lstlisting}
+Using a seed allows to have random reproducible inizializations since a seed determines the beginning of the pseudo-random sequence of values and furthermore the calling of \emph{rand\_r(seed)} ensures that each different processes who may running the application use the same seed. The latter will be crucial when comparing the results with the parallel application.
+Please also notice that in \emph{rand\_uniform} function we also normalize what \emph{rand\_r(seed)} returns and bounds that number to an arbitrary range and that RNG values are drawn from an uniform distribution in order to avoid directional or positional biases.
+
+In our experiments the interval $\left(-1.0, 1.0\right)$ has been forced to focus on the gravitational interaction.
+
+
+\subsubsection{Performance Analysis}
+\label{sec:performance_analysis}
+In subsection~\ref{subsec:time_complexity}, it was shown that the time complexity of the serial algorithm is $O(N^2)$.  
+To evaluate whether this theoretical estimate holds in practice, the C implementation was executed eight times with the number of bodies $N$ increasing from $100$ to $12\,800$.  
+For all runs, the number of simulation steps was fixed at $T = 100$, the time step size at $\Delta t = 0.01$, and the gravitational constant at $G = 39.47$.  
+
+Execution time was measured using the \emph{clock} function from the C standard library (\texttt{time.h}).  
+
+The tests were conducted on a machine whose detailed specifications are reported in Appendix~\ref{appendix:machine_specs}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{ex_time_vs_bodies.png}
+    \caption{Execution time as a function of the number of bodies $N$.}
+    \label{fig:ex_time}
+\end{figure}
+As expected the running time has a non-linear relationship with the number of bodies as can be seen in Figure \ref{fig:ex_time}.
+
+The log-log plot in Figure \ref{fig:logex_time} reveals an approximately straight line, indicating a power-law relationship, i.e., a quantity varies with the power of another, suggesting a time complexity around $O(N^2)$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{logex_time_vs_logbodies.png}
+    \caption{Log-log plot of execution time vs.\ number of bodies, revealing a power-law relationship.}
+    \label{fig:logex_time}
+\end{figure}
+The raw measurements used to generate Figures~\ref{fig:ex_time} and~\ref{fig:logex_time} are reported in Appendix~\ref{appendix:serial_times}.
+
+Since the empirical results confirmed that the time complexity of the C program is $O(N^2)$, it is worth recalling the reasoning presented in subsection~\ref{subsec:time_complexity}: the overall time complexity is dominated by the \emph{Compute accelerations} algorithm~\ref{alg:inner_loop}, as the other components of the serial algorithm involve only a single loop over the $N$ bodies ($N$ being the problem size).
+This implies that the execution time is mainly due to the \texttt{compute\discretionary{}{}{}Accelerations()} function.
+
+To verify this, the C code was compiled with profiling enabled, and the \emph{gprof} profiler 
+was used to produce a performance report. The main results are presented in 
+Appendix~\ref{appendix:gprof_results}.
+As predicted, \texttt{computeAccelerations()} dominates the runtime (98.49\%), confirming it is the primary bottleneck of the serial implementation.
+
+It is also insightful to analyze performance from a hardware perspective. The built-in Linux profiler \emph{perf} was used for this purpose.
+The results of the \emph{perf} profiler are reported in Appendix~\ref{appendix:perf_results}.
+
+Since \texttt{compute\discretionary{}{}{}Accelerations()} keeps the CPU busy for the vast majority of execution time, these measurements can be safely attributed to this function.
+
+The very low branch-miss rate ($0.06\%$) indicates that the control flow within the inner loop is highly predictable. Furthermore, the low percentage of frontend idle cycles ($0.14\%$) confirms that the workload is highly CPU-bound.
+The measured instructions-per-cycle (IPC) of $2.43$ corresponds to a cycles-per-instruction (CPI) of approximately $0.41$, meaning that on average each instruction is retired in less than one clock cycle. This is likely due to the microarchitecture of the test machine, which can exploit multiple execution pipelines, out-of-order execution, minimal memory stalls and compiler optimizations.
+
+The computer can do so because there are very little data dependencies present in the \texttt{compute\discretionary{}{}{}Accelerations()} function: to compute the accelerations it is required to produce first the positions.
+
+On the other hand is crucial to notice that the inner loop iterations are independent from one another, i.e, they could be overlapped.
+This means, of course that loop unrolling can be applied, but more importantly that the loop iterations can be distributed accross processes.
+
 %
+%Parallel applications
+%
+
+\appendix
+
+
+\section[Simulation Parameters (Solar System)]{Simulation Parameters for the Solar System Test}
+\label{appendix:solar_params}
+
+The following configuration was used for the simulation shown in Figure~\ref{fig:long_solar_system}:
+
+\begin{verbatim}
+39.4784176 10 20000 0.001
+1.0
+0 0 0
+0 0 0
+3.00e-6
+0.39 0 0
+0 10.2 0
+3.26e-7
+0.72 0 0
+0 7.4 0
+3.00e-6
+1.0 0 0
+0 6.28 0
+3.32e-7
+1.52 0 0
+0 5.1 0
+9.50e-4
+5.2 0 0
+0 2.75 0
+2.86e-4
+9.58 0 0
+0 2.03 0
+4.36e-5
+19.2 0 0
+0 1.43 0
+5.15e-5
+30.1 0 0
+0 1.14 0
+1.02e-8
+39.5 0 0
+0 1.0 0
+\end{verbatim}
+
+Where the first line specifies:
+\begin{itemize}
+    \item Gravitational constant $G$
+    \item Number of bodies $N$
+    \item Number of steps $T$
+    \item Time step $\Delta t$
+\end{itemize}
+and each body is defined by: mass, initial $(x, y, z)$ position, and initial $(v_x, v_y, v_z)$ velocity.
+
+\section[Machine Specifications]{Machine Specifications}
+\label{appendix:machine_specs}
+\begin{tabular}{ll}
+\toprule
+Architecture & x86\_64 \\
+CPU Model & AMD Ryzen 5 5625U with Radeon Graphics (12 threads, 6 cores) \\
+Base/Max Clock & 2.3 GHz / 4.388 GHz \\
+L1 Cache & 192 KiB (6 instances) \\
+L2 Cache & 3 MiB (6 instances) \\
+L3 Cache & 16 MiB (1 instance) \\
+Memory & 8 GB DDR4 \\
+OS & Ubuntu 22.04.5 LTS, 64-bit \\
+Compiler & \texttt{gcc} 11.4.0 with \texttt{-O2} optimization \\
+\bottomrule
+\end{tabular}
+
+\section{Serial Implementation Timing Data}
+\label{appendix:serial_times}
+The following table reports the execution times (in seconds) measured for the performance analysis in Section~\ref{sec:performance_analysis}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{r r}
+        \toprule
+        \textbf{$N$ (bodies)} & \textbf{Execution time (s)} \\
+        \midrule
+        100 & 0.012 \\
+        200 & 0.049 \\
+        400 & 0.198 \\
+        800 & 0.796 \\
+        1600 & 3.187 \\
+        3200 & 12.732 \\
+        6400 & 50.902 \\
+        12800 & 203.671 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Execution times used to generate Figures~\ref{fig:ex_time} and~\ref{fig:logex_time}.}
+    \label{tab:serial_times}
+\end{table}
+
+\section{Profiling Results}
+\label{appendix:profiling_results}
+This appendix reports profiling data for the serial C implementation.
+Two profiling tools were used:
+\begin{itemize}
+    \item GNU \emph{gprof}, to obtain a function-level breakdown of execution time.
+    \item Linux \emph{perf}, to collect low-level CPU performance metrics.
+\end{itemize}
+
+\subsection{gprof Flat Profile (Summary)}
+\label{appendix:gprof_results}
+The program was compiled with the \texttt{-pg} flag and executed under the same settings used in the performance analysis (\S\ref{sec:performance_analysis}) with the exception of $N = 10000$. The resulting \texttt{gmon.out} file was processed with:
+\begin{verbatim}
+gprof serial gmon.out > profiling_report.txt
+\end{verbatim}
+\begin{table}[H]
+\centering
+\label{tab:gprof_summary}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Function} & \textbf{\% Time} & \textbf{Self (s)} & \textbf{Calls}  \\
+\midrule
+\texttt{computeAccelerations} & 98.49 & 150.54 & 100 \\
+\texttt{\_init}               &  1.49 &   2.28 & --- \\
+\texttt{computeVelocities}    &  0.01 &   0.02 & 100 \\
+\texttt{logPositions}         &  0.01 &   0.01 & 101 \\
+\texttt{rand\_uniform}        &  0.00 &   0.00 & 60000 \\
+\texttt{computePositions}     &  0.00 &   0.00 & 100 \\
+\texttt{simulate}             &  0.00 &   0.00 & 100 \\
+\texttt{initiateSystem}       &  0.00 &   0.00 & 1   \\
+\bottomrule
+\end{tabular}
+\caption{Distribution of execution time by function (gprof flat profile).}
+\end{table}
+Please note that the \texttt{\_init} function is not part of the N-body program; it is automatically inserted by the C runtime environment during the executable’s startup sequence to perform system-level 
+initializations before \texttt{main()} is called.
+
+
+\subsection{perf Results}
+\label{appendix:perf_results}
+The profiling command used was:
+\begin{verbatim}
+perf stat ./serial 12800
+\end{verbatim}
+\begin{table}[H]
+\centering
+\label{tab:perf_summary}
+\begin{tabular}{l r}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Task-clock & $268.400$ ms \\
+CPU Utilization & $1.000$ CPUs \\
+Context-switches & $933$ ($3.48$/s) \\
+CPU Migrations & $194$ ($0.72$/s) \\
+Page-faults & $316$ ($1.18$/s) \\
+Cycles & $1.165 \times 10^{9}$ ($4.341$ GHz) \\
+Stalled-cycles-frontend & $1.590 \times 10^{6}$ ($0.14\%$ frontend idle) \\
+Instructions & $2.837 \times 10^{9}$ ($2.43$ IPC) \\
+Branches & $1.152 \times 10^{8}$ \\
+Branch-misses & $7.05 \times 10^{7}$ ($0.06\%$ of all branches) \\
+Elapsed time & $268.410$ s \\
+User time & $268.398$ s \\
+System time & $0.002$ s \\
+\bottomrule
+\end{tabular}
+\caption{\texttt{perf} summary for serial execution with $N = 12\,800$.}
+\end{table}
+
+
+
+
+
 \bibliographystyle{IEEEtran} %I had to install a package through the package manager to use 'IEEEtran'.
 \bibliography{refs} 
 \end{document}

@@ -285,7 +285,7 @@ Since in the experiments conducted $N \gg T$, the factor $T$ will be omitted fro
 The serial algorithm requires storing the masses, the positions, the velocities and the accelerations of the $N$ bodies. Since the kinematic quantities are 3D vectors, each elements corresponds to 3 floating-point values.
 This means the total storage is:
 
-This means the total storage is: %aligne is a math environment
+This means the total storage is: %align is a math environment
 \begin{align*}
 &N \ \text{masses} + 3N \ \text{positions} + 3N \ \text{velocities} \\
 &\quad + 3N \ \text{accelerations} = 10N \ \text{real values}
@@ -367,7 +367,7 @@ In our experiments the interval $\left(-1.0, 1.0\right)$ has been forced to focu
 
 
 \subsubsection{Performance Analysis}
-\label{sec:performance_analysis}
+\label{subsec:performance_analysis}
 In subsection~\ref{subsec:time_complexity}, it was shown that the time complexity of the serial algorithm is $O(N^2)$.  
 To evaluate whether this theoretical estimate holds in practice, the C implementation was executed eight times with the number of bodies $N$ increasing from $100$ to $12\,800$.  
 For all runs, the number of simulation steps was fixed at $T = 100$, the time step size at $\Delta t = 0.01$, and the gravitational constant at $G = 39.47$.  
@@ -410,14 +410,53 @@ Since \texttt{compute\discretionary{}{}{}Accelerations()} keeps the CPU busy for
 The very low branch-miss rate ($0.06\%$) indicates that the control flow within the inner loop is highly predictable. Furthermore, the low percentage of frontend idle cycles ($0.14\%$) confirms that the workload is highly CPU-bound.
 The measured instructions-per-cycle (IPC) of $2.43$ corresponds to a cycles-per-instruction (CPI) of approximately $0.41$, meaning that on average each instruction is retired in less than one clock cycle. This is likely due to the microarchitecture of the test machine, which can exploit multiple execution pipelines, out-of-order execution, minimal memory stalls and compiler optimizations.
 
-The computer can do so because there are very little data dependencies present in the \texttt{compute\discretionary{}{}{}Accelerations()} function: to compute the accelerations it is required to produce first the positions.
+\subsubsection{A-priori Study of Available Parallelism}
 
-On the other hand is crucial to notice that the inner loop iterations are independent from one another, i.e, they could be overlapped.
-This means, of course that loop unrolling can be applied, but more importantly that the loop iterations can be distributed accross processes.
+In Subsection~\ref{subsec:performance_analysis} it is highlighted how the \texttt{compute\discretionary{}{}{}Accelerations()} is the bottleneck of the serial algorithm, with a CPI ($0.41$), which is lower than 1.
+This efficiency is due both to the microarchitecture of the testing machine (see Appendix~\ref{appendix:machine_specs}) and to the limited data dependencies in 
+\texttt{compute\discretionary{}{}{}Accelerations()}, namely that to compute the accelerations, 
+only the positions need to be known in advance.
 
-%
-%Parallel applications
-%
+On the other hand is crucial to note that the inner loop (Algorithm~\ref{alg:inner_loop}) iterations are independent from one another, i.e., they could be overlapped.
+This means, of course, that loop unrolling can be applied, but more importantly that the loop iterations can be distributed across processes.
+
+This suggests that it would be effective to build a parallel application.
+By using \emph{Amdahl’s law} it is possible to know a priory the theoretical speedup of the parallel application, i.e., how much faster the parallel program would be compared to the serial algorithm.
+\begin{equation}
+\begin{aligned}
+Speedup(N) &= \frac{time_{serial}}{time_{parallel}(N)}=\frac{(S+P)\times time_{serial}}{(S\times t_{serial}+\frac{P\times t_{serial}}{N})} \\ &=\frac{S+P}{S+\frac{P}{N}}=\frac{1}{S+\frac{P}{N}}
+\end{aligned}
+\label{eq:amdahl}
+\end{equation}
+\begin{description}
+    \item[\normalfont{time\_{serial}}] Execution time of the serial application.
+    \item[\normalfont{time\_{parallel}}] Execution time of the parallel application.
+    \item[N] The number of CPUs.
+    \item[\( S \)] The fraction of the code that cannot be parallelized (inherently sequential part).
+    \item[\( P \)] The fraction of the code that can be parallelized.
+    \item[\( S + P = 1 \)].
+\end{description}
+In this case all the code can be parallelized since there are no loop-carried dependencies. Nevertheless also the other pieces of the program can be parallelized as well.
+Then applying~\eqref{eq:amdahl}, with $S=0$ and $P=1$, gives:
+\begin{equation}
+Speedup(N)=N
+\label{eq:speedup}
+\end{equation}
+This means that a priori a linear speedup is expected: doubling the number of CPUs $N$ corresponds to halve the execution time.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{linear_speedup.png}
+    \caption{Speedup as a function of the number of CPUs.}
+    \label{fig:linear_speedup}
+\end{figure}
+However, this scenario is too optimistic to be true — and indeed it would only occur if communication among the processes were instantaneous. To be clear if we assign to each CPU (process) a single mass, in order for each process to compyte the acceleration for its own mass it is necessary to know where the other masses are located. Hence each process has to communicate the other the position and this takes time.
+
+
+\section{MPI Parallel Implementation}
+
+The \emph{Message Passing Interface} (MPI) is a standardized specification for developing parallel programs that execute across multiple processes, potentially on different machines~\cite{mpi_standard}.
+MPI provides mechanisms for processes to communicate by sending and receiving messages, as well as for synchronizing their execution.
+For this project, version~4.1.1 of the \emph{OpenMPI} implementation was used, targeting the C/C++ programming languages~\cite{openmpi_docs}.
 
 \appendix
 
@@ -488,7 +527,7 @@ Compiler & \texttt{gcc} 11.4.0 with \texttt{-O2} optimization \\
 
 \section{Serial Implementation Timing Data}
 \label{appendix:serial_times}
-The following table reports the execution times (in seconds) measured for the performance analysis in Section~\ref{sec:performance_analysis}.
+The following table reports the execution times (in seconds) measured for the performance analysis in Subsection~\ref{subsec:num_int}.
 
 \begin{table}[H]
     \centering
@@ -521,7 +560,7 @@ Two profiling tools were used:
 
 \subsection{gprof Flat Profile (Summary)}
 \label{appendix:gprof_results}
-The program was compiled with the \texttt{-pg} flag and executed under the same settings used in the performance analysis (\S\ref{sec:performance_analysis}) with the exception of $N = 10000$. The resulting \texttt{gmon.out} file was processed with:
+The program was compiled with the \texttt{-pg} flag and executed under the same settings used in the performance analysis (\S\ref{subsec:num_int}) with the exception of $N = 10000$. The resulting \texttt{gmon.out} file was processed with:
 \begin{verbatim}
 gprof serial gmon.out > profiling_report.txt
 \end{verbatim}
@@ -578,8 +617,6 @@ System time & $0.002$ s \\
 \end{tabular}
 \caption{\texttt{perf} summary for serial execution with $N = 12\,800$.}
 \end{table}
-
-
 
 
 

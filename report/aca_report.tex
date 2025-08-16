@@ -411,8 +411,8 @@ The very low branch-miss rate ($0.06\%$) indicates that the control flow within 
 The measured instructions-per-cycle (IPC) of $2.43$ corresponds to a cycles-per-instruction (CPI) of approximately $0.41$, meaning that on average each instruction is retired in less than one clock cycle. This is likely due to the microarchitecture of the test machine, which can exploit multiple execution pipelines, out-of-order execution, minimal memory stalls and compiler optimizations.
 
 \subsubsection{A-priori Study of Available Parallelism}
-
-In Subsection~\ref{subsec:performance_analysis} it is highlighted how the \texttt{compute\discretionary{}{}{}Accelerations()} is the bottleneck of the serial algorithm, with a CPI ($0.41$), which is lower than 1.
+\label{subsec:apriori_parallelism}
+In Subsection~\ref{subsec:performance_analysis} it is highlighted how, although the \texttt{compute\discretionary{}{}{}Accelerations()} is the bottleneck of the serial algorithm, its CPI is ($0.41$), which is lower than 1.
 This efficiency is due both to the microarchitecture of the testing machine (see Appendix~\ref{appendix:machine_specs}) and to the limited data dependencies in 
 \texttt{compute\discretionary{}{}{}Accelerations()}, namely that to compute the accelerations, 
 only the positions need to be known in advance.
@@ -429,9 +429,9 @@ Speedup(N) &= \frac{time_{serial}}{time_{parallel}(N)}=\frac{(S+P)\times time_{s
 \label{eq:amdahl}
 \end{equation}
 \begin{description}
-    \item[\normalfont{time\_{serial}}] Execution time of the serial application.
-    \item[\normalfont{time\_{parallel}}] Execution time of the parallel application.
-    \item[N] The number of CPUs.
+    \item[\normalfont{$time\_{serial}$}] Execution time of the serial application.
+    \item[\normalfont{$time\_{parallel}$}] Execution time of the parallel application.
+    \item[\normalfont{$N$}] The number of CPUs.
     \item[\( S \)] The fraction of the code that cannot be parallelized (inherently sequential part).
     \item[\( P \)] The fraction of the code that can be parallelized.
     \item[\( S + P = 1 \)].
@@ -451,12 +451,132 @@ This means that a priori a linear speedup is expected: doubling the number of CP
 \end{figure}
 However, this scenario is too optimistic to be true — and indeed it would only occur if communication among the processes were instantaneous. To be clear if we assign to each CPU (process) a single mass, in order for each process to compyte the acceleration for its own mass it is necessary to know where the other masses are located. Hence each process has to communicate the other the position and this takes time.
 
+\section{Parallel Algorithm}
+\subsection{Conceptual Design}
+The chosen approach to parallelize the N-body problem algorithm (Algorithm~\ref{alg:serial}) is as follows.  
+Given $N$ bodies and $P$ processes, each process is assigned $\frac{N}{P}$ bodies.  
+This means it is responsible for initializing these bodies and updating their kinematic quantities during the simulation.  
 
-\section{MPI Parallel Implementation}
+However, to compute the accelerations for its local bodies, a process requires the positions of \emph{all} bodies in the system.  
+For this reason, after the initialization phase and at the end of every simulation step, all processes must exchange the positions of their bodies.  
+During the initialization phase, the masses must also be broadcast to all processes, since they are required in the acceleration computation.
+It is important to note that no process can start computing accelerations for its local bodies until it has received the position data from all other processes.
+This flow is shown in Algorithm~\ref{alg:parallel}.
+
+\begin{algorithm}[H]
+\caption{Parallel N-body (single-process view)}
+\label{alg:parallel}
+\begin{algorithmic}[1]
+\State Initialize local positions, local velocities, and local masses
+\State Send local positions and local masses
+\State Wait for global positions and global masses
+\For{each time step}
+    \State Compute local accelerations (Algorithm~\ref{alg:parallel_inner_loop})
+    \State Update local velocities
+    \State Update local positions
+    \State Send local positions
+    \State Wait for global positions
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+As discussed in Subsections~\ref{subsec:performance_analysis} and~\ref{subsec:apriori_parallelism}, 
+the main motivation for building a parallel algorithm was to distribute the workload of the inner loop 
+of the serial algorithm (Algorithm~\ref{alg:inner_loop}).
+
+Conceptually, the structure of the computation remains the same, with the only difference that 
+the outermost loop now iterates over $\frac{N}{P}$ local bodies, as shown in 
+Algorithm~\ref{alg:parallel_inner_loop}.
+
+
+\begin{algorithm}[H]
+\caption{Parallel inner loop: compute local accelerations}
+\label{alg:parallel_inner_loop}
+\begin{algorithmic}[1]
+\Require Global positions $\{\vec r_j\}_{j=0}^{N-1}$, global masses $\{m_j\}_{j=0}^{N-1}$
+\Ensure Local accelerations $\{\vec a_i\}_{i=0}^{(N/P)-1}$
+\For{each local body $i$}
+  \State $\vec a_i \gets (0,0,0)$
+  \For{$j \gets 0$ to $N-1$}
+    \If{$j$ is not the same as global index of $i$}
+      \State $\vec d \gets \vec r_j - \vec r_i$
+      \State $R^3 \gets \|\vec d\|^3$
+      \State $invR^3 \gets 1 / R^3$
+      \State $\vec a_i \gets \vec a_i + G \, m_j \, invR^3 \, \vec d$
+    \EndIf
+  \EndFor
+\EndFor
+\Statex \textbf{Time complexity (per process):} $O\!\left(\frac{N}{P} \cdot N\right) = O\!\left(\frac{N^2}{P}\right)$
+\end{algorithmic}
+\end{algorithm}
+
+It follows that the total computational work remains $O(N^2)$, but the per-process 
+workload is reduced to $O\!\left(\frac{N^2}{P}\right)$, assuming perfect load balancing 
+and negligible communication overhead.
+
+\subsection{Theoretical Scalability}
+\emph{Scalability} measures how much faster a parallel algorithm runs using P processes compared to running on a single process:
+\begin{equation}
+Scalability(P) = \frac{t_{parallel}(1)}{t_{parallel}(P)}
+\end{equation}
+where $t_{parallel}(P)$ is the execution time of the parallel application using $P$ processes.
+
+
+Assuming no communication overhead and ignoring hardware-related effects, in the problem considered in this report, with $P = 1$, the running time can be expressed as
+\begin{equation}
+t_{{parallel}}(1) = N_1^2 \, \bar{t}
+\end{equation}
+where $\bar{t}$ is the time per iteration of the inner loop (Algorithm~\ref{alg:inner_loop}) and $N_1$ is the number of bodies in the parallel application with 1 process.
+
+This implies that with $P>1$ the running time is
+\begin{equation}
+t_{{parallel}}(P) = \frac{N_p^2}{P} \, \bar{t}
+\end{equation}
+where $N_p$ is the number of bodies in the parallel application with $P$ processes.
+
+Then it is possible to write:
+\begin{equation}
+Scalability(P) = \frac{N^2_1\bar{t}}{\frac{N_p^2}{P}\bar{t}} = \frac{N_1^2}{N_p^2}P
+\end{equation}
+
+Depending on whether the problem size, the total number of bodies $N$, is fixed or increases with $P$, two kinds of scalability measures are typically considered: \emph{strong scalability} and \emph{weak scalability}, discussed below.
+
+\paragraph{Strong Scalability.}
+Strong scalability measures how the execution time decreases when the number of processes $P$ increases, while keeping the total problem size $N$ fixed.  
+In this case, $N_p = N_1 = N$ and the scalability formula reduces to
+\[
+Scalability_{\text{strong}}(P) = P
+\]
+Theoretically, the strong scalability of the parallel N-Body algorithm is ideal, since the same workload can be completed $P$ times faster.
+
+\paragraph{Weak Scalability.}
+Weak scalability measures how the execution time changes when the number of processes $P$ increases while keeping the \emph{per-process workload} fixed.  
+Since the per-process workload is $\tfrac{N_p}{P} = N_1$, the scalability formula becomes
+\[
+Scalability_{\text{weak}}(P) = \frac{N_1^2}{(P N_1)^2} \, P = \frac{1}{P}.
+\]
+
+This shows that the presented parallel N-Body algorithm exhibits poor weak scalability.  
+Ideally, increasing both the number of bodies $N$ and the number of processes $P$ in the same ratio should maintain the execution time constant, i.e.\ $Scalability_{\text{weak}}(P) = 1$.  
+However, this is not the case here: if both $N$ and $P$ are doubled, each process is still responsible for the same number of bodies as before, but the inner loop of the \texttt{compute\discretionary{}{}{}Accelerations()} routine must iterate over all $N$ bodies.  
+This can also be seen directly from the per-process time complexity $O\!\left(\tfrac{N^2}{P}\right)$: doubling both $N$ and $P$ results in a doubling of the per-process time.
+
+As a consequence, the per-process workload grows with $P$, and the overall execution time of the parallel algorithm increases rather than staying constant.  
+This is an inherent limitation of the direct method formulation in the N-Body problem.
+
+
+
+
+\subsection{MPI Implementation}
 
 The \emph{Message Passing Interface} (MPI) is a standardized specification for developing parallel programs that execute across multiple processes, potentially on different machines~\cite{mpi_standard}.
 MPI provides mechanisms for processes to communicate by sending and receiving messages, as well as for synchronizing their execution.
 For this project, version~4.1.1 of the \emph{OpenMPI} implementation was used, targeting the C/C++ programming languages~\cite{openmpi_docs}.
+
+% Explain practical MPI choices, data distribution, synchronization, and profiling, space complexity
+
+
+%ora spiega il ragionamento che avevi scritto da qualche parte, poi presenta le funzioni che usi e spiega pezzi di codice degni di nota. Quindi passa alla GCP.
 
 \appendix
 

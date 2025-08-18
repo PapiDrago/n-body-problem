@@ -1,6 +1,6 @@
-#include<stdlib.h>
-#include<math.h>
-#include<time.h>
+#include <stdlib.h>
+#include <math.h>
+#include <time.h>
 #include <stdio.h>
 #include <mpi.h>
 
@@ -10,7 +10,6 @@ typedef struct{
 
 MPI_Datatype MPI_VECTOR;
 
-//int bodies = 100;
 double GravConstant = 39.47;
 double dt = 0.01;
 int N = 100; // number of iterations
@@ -24,9 +23,9 @@ double rand_uniform(unsigned int *seed, double min, double max) {
 unsigned int global_start_index(int r, int bodies, int rank){
     unsigned int start_index;
     if (rank < r) {
-      return rank*bodies;
+    		return rank*bodies;
     } else {
-      return r*(bodies+1) + (rank - r)*bodies;
+    		return r*(bodies+1) + (rank - r)*bodies;
       }
 
 }
@@ -43,9 +42,8 @@ void initiateSystem(vector *local_positions, double *local_masses, vector *veloc
           velocities[i].y = rand_uniform(&seed, -0.5, 0.5);
           velocities[i].z = rand_uniform(&seed, -0.5, 0.5);
 
-          local_masses[i] = 1.0; // For simplicity
+          local_masses[i] = 1.0;
 
-          // Initialize accelerations to zero
           accelerations[i].x = 0;
           accelerations[i].y = 0;
           accelerations[i].z = 0;
@@ -98,10 +96,15 @@ void computePositions(vector *local_positions, vector *velocities, int own_bodie
 }
 
 
-void simulate(int global_bodies, int own_bodies, unsigned int start_global_index, double dt, vector *global_positions, double *global_masses, vector *accelerations, vector *velocities, vector *local_positions){
+void simulate(int global_bodies, int own_bodies, unsigned int start_global_index, double dt, vector *global_positions, double *global_masses, vector *accelerations, vector *velocities, vector *local_positions, double* t4, double* t5, double* t6, double* cumul_time_accel, double* cumul_time_velpos){
+	*t4 = MPI_Wtime();
 	computeAccelerations(global_bodies, own_bodies, start_global_index, global_positions, global_masses, accelerations);
+	*t5 = MPI_Wtime();
 	computeVelocities(own_bodies, accelerations, velocities, dt);
 	computePositions(local_positions, velocities, own_bodies, dt);
+	*t6 = MPI_Wtime();
+	*cumul_time_accel += *t5-*t4; 
+	*cumul_time_velpos += *t6-*t5;
 }
 
 void logPositions(FILE *fp, int global_bodies, vector *global_positions) {
@@ -118,7 +121,7 @@ void createVectorType() {
     int count = 3; // My custom MPI_Datatype will have 3 fields (x, y, z)
     int blocklengths[3] = {1, 1, 1}; // Each field is just one element
     MPI_Aint offsets[3]; // To assure full architecture portability we have to tell MPI how elements in our struct are stored.
-    offsets[0] = offsetof(vector, x); // the first element in my MPI_Datatype object has to be distant from the base an amount of byte equal to the base of vector and x, i.e. 0                                        byte
+    offsets[0] = offsetof(vector, x); // the first element in my MPI_Datatype object has to be distant from the base an amount of byte equal to the base of vector and x, i.e 0 byte
     offsets[1] = offsetof(vector, y); // 8 byte
     offsets[2] = offsetof(vector, z); // 16 byte
     MPI_Datatype types[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE}; // Each element of my custom MPI_Datatype is an MPI_DOUBLE
@@ -130,10 +133,10 @@ void createVectorType() {
 void computeAllGathervParams(int* recvcounts, int* displs, int size, int q, int r) {
   for (int i = 0; i < size; i++) {
       if (i < r) {
-         recvcounts[i] = q + 1;
-         displs[i] = i * (q + 1);
+         recvcounts[i] = q + 1;	// if i < r, process i will receive from MPI_AllGatherv q+1 items
+         displs[i] = i * (q + 1);	// // if i < r, incoming data from process i will have a displacement i*(q+1) relative to the starting adress of 'recvbuf', i.e. global_positions or global_masses in this case
      } else {
-        recvcounts[i] = q;
+        recvcounts[i] = q;	// if i >= r, process i will receive from MPI_AllGatherv q items
         displs[i] = r * (q + 1) + (i - r) * q;
     }
   }
@@ -152,16 +155,35 @@ int main (int argc, char *argv[]) {
   FILE *output = NULL;
   
   int bodies;
+  double t0 = 0;
+  double t1 = 0;
+  double t2 = 0;
+  double t3 = 0;
+  double t4 = 0;
+  double t5 = 0;
+  double t6 = 0;
+  double t7 = 0;
+  double t8 = 0;
+  double t9 = 0;
+  double cumul_time_allgatherv3 = 0;
+  double cumul_time_accel = 0;
+  double cumul_time_velpos = 0;
+  
   if (argc > 1) {
-        bodies = atoi(argv[1]);  // Convert the first argument to an int
+        bodies = atoi(argv[1]);
         if (bodies <= 0) {
-            fprintf(stderr, "Error: number of bodies must be a positive integer.\n");
+        	if (myrank == 0) {
+            		fprintf(stderr, "Error: number of bodies must be a positive integer.\n");
+            		}
             return 1;
         }
   } else {
-        bodies = 10;  // Default value
-        printf("No argument provided. Using default: %d bodies.\n", bodies);
+        bodies = 16;  // Default value
+        	/**if (myrank == 0) {
+        		printf("No argument provided. Using default: %d bodies.\n", bodies);
+        		}**/
     }
+  
   
   
   
@@ -195,20 +217,30 @@ int main (int argc, char *argv[]) {
     
   unsigned int start_index = global_start_index(r, b, myrank);
   
+  t0 = MPI_Wtime();
+  
   initiateSystem(local_positions, local_masses, velocities, accelerations, b, start_index);
+  t1 = MPI_Wtime();
   MPI_Allgatherv(local_positions, b, MPI_VECTOR, global_positions, recvcounts, displs, MPI_VECTOR, MPI_COMM_WORLD);
+  t2 = MPI_Wtime();
   MPI_Allgatherv(local_masses, b, MPI_DOUBLE, global_masses, recvcounts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
+  t3 = MPI_Wtime();
+  
   if (myrank == 0) {
       logPositions(output, bodies, global_positions);
     }
+  
   for (int i = 0; i<N; i++) {
-    simulate(bodies, b, start_index, dt, global_positions, global_masses, accelerations, velocities, local_positions);
+    simulate(bodies, b, start_index, dt, global_positions, global_masses, accelerations, velocities, local_positions, &t4, &t5, &t6, &cumul_time_accel, &cumul_time_velpos);
+    t7 = MPI_Wtime();
     MPI_Allgatherv(local_positions, b, MPI_VECTOR, global_positions, recvcounts, displs, MPI_VECTOR, MPI_COMM_WORLD);
+    t8 = MPI_Wtime();
+    cumul_time_allgatherv3 += t8-t7;
     if (myrank == 0) {
       logPositions(output, bodies, global_positions);
     }
   }
-  
+  t9 = MPI_Wtime();
   
   free(global_positions);
   free(global_masses);
@@ -219,8 +251,18 @@ int main (int argc, char *argv[]) {
   
   if (myrank == 0) {
       fclose(output);
+      printf("Allgatherv1: %f s\n", t2 - t1);
+      printf("Allgatherv2:  %f s\n", t3 - t2);
+      printf("ComputeAccelerations:  %f s\n", t5 - t4);
+      printf("ComputeAccelerations total time:  %f s\n", cumul_time_accel);
+      printf("Vel+pos: %f s\n", t6 - t5);
+      printf("Vel+pos total time: %f s\n", cumul_time_velpos);
+      printf("Allgatherv3:   %f s\n", t8 - t7);
+      printf("Allgatherv3 total time:   %f s\n", cumul_time_allgatherv3);
+      printf("Total:   %f s\n", t9 - t0);
     }
   
   
   MPI_Finalize();
 }
+

@@ -300,7 +300,8 @@ On modern general-purpose computers, this is not a limiting factor because sever
 which easily fits in memory.
 
 \subsection{Implementation in C}
-The conceptual serial algorithm described in the previous subsection was implemented in the C programming language. This choice was primarily motivated by the need to perform detailed profiling of the code. The complete source code is publicly available on the GitHub repository for this project\footnote{\url{https://github.com/PapiDrago/n-body-problem}, file \emph{serial.c}}.
+\label{subsec:c_impl}
+The conceptual serial algorithm described in the previous subsection was implemented in the C programming language. This choice was primarily motivated by the need to perform detailed profiling of the code. The complete source code is publicly available on the GitHub repository for this project\footnote{\url{https://github.com/PapiDrago/n-body-problem}\label{fn:repo}, file \emph{serial.c}}.
 
 The implementation follows closely the structure of Algorithm~\ref{alg:serial}, with each major step of the simulation (initialization, acceleration computation, velocity update, and position update) mapped to dedicated functions.
 This modular structure facilitates both readability and profiling, enabling the identification of computational bottlenecks.  
@@ -353,6 +354,7 @@ These qualitative observations confirm that the combination of the direct gravit
 The parameters used to produce Figure~\ref{fig:long_solar_system} are reported in Appendix~\ref{appendix:solar_params}.
 
 \subsubsection{Random Initialization}
+\label{subsec:random_init}
 The standard version of the serial application initialized the simulated system randomly. This makes simpler doing experiments with a large quantities of bodies: the program receives the number of bodies from the user through the command-line.
 It is worth noticing the use into the inizialization routine of the function \emph{rand\_uniform}.
 \begin{lstlisting}
@@ -565,18 +567,105 @@ As a consequence, the per-process workload grows with $P$, and the overall execu
 This is an inherent limitation of the direct method formulation in the N-Body problem.
 
 
-
-
 \subsection{MPI Implementation}
 
 The \emph{Message Passing Interface} (MPI) is a standardized specification for developing parallel programs that execute across multiple processes, potentially on different machines~\cite{mpi_standard}.
 MPI provides mechanisms for processes to communicate by sending and receiving messages, as well as for synchronizing their execution.
 For this project, version~4.1.1 of the \emph{OpenMPI} implementation was used, targeting the C/C++ programming languages~\cite{openmpi_docs}.
 
-% Explain practical MPI choices, data distribution, synchronization, and profiling, space complexity
+The full MPI implementation is provided in the file \texttt{parallel.c}, available in the remote repository associated to the project (see footnote~\ref{fn:repo}).
 
+\subsubsection{Communication Strategy}
 
-%ora spiega il ragionamento che avevi scritto da qualche parte, poi presenta le funzioni che usi e spiega pezzi di codice degni di nota. Quindi passa alla GCP.
+With reference to Algorithm~\ref{alg:parallel_inner_loop}, each process requires access to the positions (and initially also the masses) of all bodies in the system in order to compute local accelerations.  
+This necessitates both communication and synchronization between processes at each iteration.
+
+In this work, the \texttt{MPI\_Allgatherv} function was chosen for this purpose, since it simultaneously performs the required \emph{sending}, \emph{receiving}, and implicit \emph{waiting}.  
+The main advantages are:
+\begin{itemize}
+    \item \textbf{Blocking collective communication:} every process broadcasts its local data to all other processes in the MPI communicator, ensuring that all participants have a consistent global view. Since the operation is blocking, no process can proceed until the data exchange of all processes has completed;
+    \item \textbf{Consistent ordering:} the received items are gathered into arrays, with the same element order from the perspective of each process;
+    \item \textbf{Flexibility:} unlike \texttt{MPI\_Allgather}, the \texttt{MPI\_Allgatherv} variant allows each process to contribute a different number of items, which makes it more general and adaptable.
+\end{itemize}
+
+The \texttt{MPI\_Allgatherv} function is invoked as follows.
+\begin{lstlisting}
+MPI_Allgatherv(local_positions, b, MPI_VECTOR, global_positions, recvcounts, displs, MPI_VECTOR, MPI_COMM_WORLD);
+\end{lstlisting}
+The address of the first element of the sending buffer is represented by \emph{local\_positions}. This buffer has \emph{b} elements where b is the number of bodies each process has to manage.
+These elements are of type \emph{MPI\_VECTOR}, a properly defined MPI data type to wrap the struct \emph{vect} already mentioned in Subsection~\ref{subsec:c_impl}.
+\begin{lstlisting}
+void createVectorType() {
+    int count = 3; // Custom MPI_Datatype will have 3 fields (x, y, z)
+	int blocklengths[3] = {1, 1, 1}; // Each field is just one element
+	MPI_Aint offsets[3]; // How elements in the struct are stored.
+    offsets[0] = offsetof(vector, x); // 0 byte offset from struct base as the 'vector' struct
+    offsets[1] = offsetof(vector, y); // 8 byte
+    offsets[2] = offsetof(vector, z); // 16 byte
+    MPI_Datatype types[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE}; // Each element of custom MPI_Datatype is an MPI_DOUBLE
+
+    MPI_Type_create_struct(count, blocklengths, offsets, types, &MPI_VECTOR);
+    MPI_Type_commit(&MPI_VECTOR); // MPI finalizes the definition and use it
+}
+\end{lstlisting}
+This allows the positions (represented as 3D vectors) to be handled and sent in a clear and structured manner.
+
+The array \emph{recvcounts} contains as many entries as the number of MPI processes, since it tells the \texttt{MPI\_Allgatherv} function how many elements each process contributes.
+When the number of bodies cannot be evenly divided among processes, the remainder $r$ is distributed in a round-robin fashion: the first $r$ processes each receive one additional body.
+This works because MPI assigns each process in the communicator a unique \emph{rank}, from $0$ to $P-1$ (with $P$ the total number of processes).
+Consequently, the first $r$ elements of the \emph{recvcounts} array will be incremented by one compared to the others.
+
+The array \emph{displs} is used to ensure that the receiving buffer \emph{global\_positions} is properly organized, i.e., to specify at which offset the data received from each process should be stored.
+More precisely, the value at index $i$ indicates the starting position in the receiving buffer where the block of elements broadcast by the process of rank $i$ will be placed. The displacement depends on both the number of elements contributed by each process and the rank order.
+The following code shows how both \emph{recvcounts} and \emph{displs} are populated:
+\begin{lstlisting}
+void computeAllGathervParams(int* recvcounts, int* displs, int size, int q, int r) {
+  for (int i = 0; i < size; i++) { /**q = bodies / size, r = bodies % size;**/
+      if (i < r) {
+         recvcounts[i] = q + 1;
+         displs[i] = i * (q + 1);
+     } else {
+        recvcounts[i] = q;
+        displs[i] = r * (q + 1) + (i - r) * q;
+    }
+  }
+}
+\end{lstlisting}
+
+\paragraph{Memory remark.}
+This communication strategy requires each process to store not only its local data ($3\frac{N}{P}$ positions, $3\frac{N}{P}$ velocities, $3\frac{N}{P}$ accelerations, and $\tfrac{N}{P}$ masses) but also the global arrays ($3N$ positions and $N$ masses).  
+This results in a per-process memory usage of
+\[
+M(P) = 10\frac{N}{P} + 4N,
+\]
+which asymptotically remains $O(N)$, dominated by the replicated global arrays.
+Consequently, memory requirements do not scale down with the number of processes.
+
+\subsubsection{Initlialization and Testing}
+The initialization phase in the parallel application closely follows what was discussed for the serial application in Subsection~\ref{subsec:random_init}, with the key difference that the seed of the random number generator is not determined solely by the local loop index $i$. Instead, it also depends on the global index of each body.
+As a consequence, the initial configuration of the parallel application can be made identical to that of the serial application because the evaluation of the global index reflects the ordered distribution of bodies across processes, mirroring the indexing scheme of the serial application.
+ 
+This reproducibility allows a direct comparison of the outputs, which is essential for validating the correctness of the parallel algorithm.
+
+The global index of the first body managed by each process is computed as follows:
+\begin{lstlisting}
+unsigned int global_start_index(int r, int bodies, int rank){
+    unsigned int start_index;
+    if (rank < r) {
+      return rank*bodies;
+    } else {
+      return r*(bodies+1) + (rank - r)*bodies;
+      }
+}
+\end{lstlisting}
+Then, during the initialization loop, the seed used for the local body $i$ is set as:
+\begin{lstlisting}
+unsigned int seed = start_index + i;
+\end{lstlisting}
+
+To practically compare the results a simple C program (\texttt{tester.c}) has been used.
+When it runs it opens both the output files of the serial and the parallel applications and checks value by value if they are equal within a tolerance introduced to allow the comparison between machines with different floating-point precisions.
+
 
 \appendix
 

@@ -121,7 +121,7 @@ void createVectorType() {
     offsets[0] = offsetof(vector, x); // the first element in my MPI_Datatype object has to be distant from the base an amount of byte equal to the base of vector and x, i.e. 0                                        byte
     offsets[1] = offsetof(vector, y); // 8 byte
     offsets[2] = offsetof(vector, z); // 16 byte
-    MPI_Datatype types[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE}; // Each element of my custom MPI_Datatype is an MPI_double
+    MPI_Datatype types[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE}; // Each element of my custom MPI_Datatype is an MPI_DOUBLE
 
     MPI_Type_create_struct(count, blocklengths, offsets, types, &MPI_VECTOR);
     MPI_Type_commit(&MPI_VECTOR); // MPI finalizes the definition and use it

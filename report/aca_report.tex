@@ -517,9 +517,11 @@ workload is reduced to $O\!\left(\frac{N^2}{P}\right)$, assuming perfect load ba
 and negligible communication overhead.
 
 \subsection{Theoretical Scalability}
+\label{subsec:theoretical_scalability}
 \emph{Scalability} measures how much faster a parallel algorithm runs using P processes compared to running on a single process:
 \begin{equation}
 Scalability(P) = \frac{t_{parallel}(1)}{t_{parallel}(P)}
+\label{eq:scalability}
 \end{equation}
 where $t_{parallel}(P)$ is the execution time of the parallel application using $P$ processes.
 
@@ -550,6 +552,7 @@ In this case, $N_p = N_1 = N$ and the scalability formula reduces to
 Scalability_{\text{strong}}(P) = P
 \]
 Theoretically, the strong scalability of the parallel N-Body algorithm is ideal, since the same workload can be completed $P$ times faster.
+The last equation highlights the fact in this case (direct-method N-body implementation) since there is no inherently sequential part as concluded in Subsection~\ref{subsec:apriori_parallelism}, analyzing strong scalability is essentially equivalent to analyzing speedup.
 
 \paragraph{Weak Scalability.}
 Weak scalability measures how the execution time changes when the number of processes $P$ increases while keeping the \emph{per-process workload} fixed.  
@@ -641,7 +644,7 @@ M(P) = 10\frac{N}{P} + 4N,
 which asymptotically remains $O(N)$, dominated by the replicated global arrays.
 Consequently, memory requirements do not scale down with the number of processes.
 
-\subsubsection{Initlialization and Testing}
+\subsubsection{Initialization and Testing}
 The initialization phase in the parallel application closely follows what was discussed for the serial application in Subsection~\ref{subsec:random_init}, with the key difference that the seed of the random number generator is not determined solely by the local loop index $i$. Instead, it also depends on the global index of each body.
 As a consequence, the initial configuration of the parallel application can be made identical to that of the serial application because the evaluation of the global index reflects the ordered distribution of bodies across processes, mirroring the indexing scheme of the serial application.
  
@@ -665,6 +668,95 @@ unsigned int seed = start_index + i;
 
 To practically compare the results a simple C program (\texttt{tester.c}) has been used.
 When it runs it opens both the output files of the serial and the parallel applications and checks value by value if they are equal within a tolerance introduced to allow the comparison between machines with different floating-point precisions.
+
+\subsection{Experimental Evaluation on GCP}
+In order to analyze the performance of the MPI implementation, it was necessary not only to rely on a multi-core architecture capable of running multiple processes concurrently, but also to distribute these processes across different machines in order to assess the impact of inter-process communication through MPI functions—in this case, \texttt{MPI\_Allgatherv}.  
+
+To meet both requirements, multiple virtual instances were deployed on the Google Cloud Platform (GCP), using the Compute Engine service~\cite{gcp_compute}, which allows the creation and execution of virtual machines on Google’s infrastructure.
+
+These virtual instances were organized into experimental clusters, based on their hardware configuration and geographic location:
+
+\begin{itemize}
+    \item \textbf{Single fat instance:} 1 machine with 16~vCPUs and 32~GB RAM, located in a single region (us-central1-a).
+    \item \textbf{Inter-regional fat instances:} 2 machines with 8~vCPUs and 16~GB RAM each (16~vCPUs total), distributed across two regions: us-central1-a and europe-west9-a.
+    \item \textbf{Intra-regional thin instances:} 4 machines with 3~vCPUs and 3~GB RAM each (12~vCPUs total), located in the same region (us-central1-a).
+    \item \textbf{Inter-regional thin instances:} 4 machines with 3~vCPUs and 3~GB RAM each (12~vCPUs total), distributed across two regions: us-central1 and europe-west1.
+    \item \textbf{Four-region thin instances:} 4 machines with 3~vCPUs and 3~GB RAM each (12~vCPUs total), distributed across four regions: us-central1, europe-west1, asia-northeast1, and me-central1.
+\end{itemize}
+
+All experiments carried out on GCP were constrained by the fact that the Google account used had a limited quota of 32~vCPUs across all regions.
+The raw data of the GCP experiments can be consulted in Appendix~\ref{appendix:gcp_data} where it is also presented the methodology used to obtain them.
+
+\paragraph{Remark.}  
+All the above machines provide two hardware threads per physical core.  
+Therefore, in principle, each configuration could run with up to twice as many MPI processes (e.g., 32 processes on the single fat instance instead of 16).  
+However, in this work only one MPI process per physical core was used in order to focus on the impact of \emph{network communication overhead}.  
+Exploiting both hardware threads would introduce additional effects related to context switching, shared cache contention, and memory bandwidth limitations, which would make it harder to isolate the contribution of inter-process communication.
+
+\subsubsection{Strong Scalability Analysis}
+As discussed in Subsection~\ref{subsec:theoretical_scalability}, in this project strong scalability is effectively equivalent to speedup, since the parallel application with a single process can be regarded as the serial application and no inherently sequential part exists in the algorithm.  
+Therefore, in the following analysis the terms \emph{speedup} and \emph{strong scalability} will be used interchangeably.
+In Subsection~\ref{subsec:apriori_parallelism}, the theoretical speedup was formulated using Amdahl's law, and it was concluded to be ideal since it scales linearly with the number of processes $P$ (Equation~\eqref{eq:speedup}).  
+However, it was also anticipated that the overhead introduced by communication through the network could significantly reduce the practical performance.
+
+When increasing the number of processes while remaining on the same machine, the experimental results empirically confirm the theoretical analysis, as shown in Figure~\ref{fig:strong_scaling_single_fat_instance} for the single fat instance.  
+In this configuration, the execution time of the parallel application halves when the number of processes is doubled (Figure~\ref{fig:single_fat_instance_ex_time}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{parallel_strong_scaling_16_cores.png}
+    \caption{The single fat instance exhibits good strong scalability.}
+    \label{fig:strong_scaling_single_fat_instance}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{single_fat_instance_ex_time.png}
+    \caption{On the single fat instance, the running time halves each time the number of processes is doubled.}
+    \label{fig:single_fat_instance_ex_time}
+\end{figure}
+
+The raw measurements used to generate Figures~\ref{fig:single_fat_instance_ex_time} and~\ref{fig:strong_scaling_single_fat_instance} are reported in Appendix~\ref{appendix:gcp_data}.  
+These data also show that the total time spent in communication, i.e.\ the cumulative time of \texttt{MPI\_Allgatherv}, remains relatively stable across all executions and is negligible compared to the total running time in this configuration, as illustrated in Figure~\ref{fig:comparison_fraction_communication}. 
+Consequently, the achievable speedup of these configurations worsens significantly, as clearly observed in the execution times of the four-region cluster (Figure~\ref{fig:four_region_ex_time}).
+This degradation can be explained by the fact that \texttt{MPI\_Allgatherv} is a blocking collective operation: all participating processes must wait until every process has both sent and received its portion of data.
+When processes are distributed across geographically distant regions, the overall execution time becomes constrained by the slowest communication path. Thus, even if most processes complete their transfers quickly, a single high-latency or congested link can stall the entire computation, amplifying the communication overhead. Furthermore, it is important to point out that delays due to network latency and throughput are inherently unpredictable. For this reason, Figure~\ref{fig:four_region_ex_time} should not be interpreted as a precise measure of running time, but rather as evidence that—even when increasing the number of processes—it cannot be guaranteed that the execution time will decrease.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{communication_fraction_ex_time.png}
+\caption{Percentage of execution time spent in \texttt{MPI\_Allgatherv} across all GCP configurations.}
+\label{fig:comparison_fraction_communication}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{four_region_ex_time.png}
+\caption{Execution times of the four-region cluster: communication overhead dominates, leading to poor strong scalability.}
+\label{fig:four_region_ex_time}
+\end{figure}
+
+\subsubsection{Weak Scalability Analysis}
+As proved in Subsection~\ref{subsec:theoretical_scalability}, the per-process workload grows with $P$, thus the overall execution time of the parallel application increases rather than staying constant.
+Rearraging equation~\ref{eq:scalability} we obtain:
+\begin{equation}
+t_{parallel}(P) = P\times t_{parallel}(1)
+\end{equation}
+Hence, when doubling both the number of processes and the number of bodies, the running time is expected to double as well, which is exactly what is observed in Figure~\ref{fig:empirical_weak_scalability}.
+Further consideration of other configurations beyond the single fat instance is unnecessary, because the weak scalability performance can only worsen due to the communication overhead.
+
+Unfortunately, this is an inherent limitation of the direct method formulation in the N-Body problem.
+The simplest way to improve weak scalability is to relax the physics by neglecting the influence of distant (non-local) bodies. This reduces the inner loop (Algorithm~\ref{alg:parallel_inner_loop} complexity to $O((\frac{N}{P})^2)$ which would make constant the per-process workload.
+
+More scalable approaches involve switching to approximate or hierarchical algorithms such as Barnes–Hut or Particle Mesh, which reduce the computational complexity from $O(N^2)$ to $O(N \log N)$ or even $O(N)$, while maintaining acceptable physical accuracy. For a practical comparison of these techniques, see Blelloch and Narlikar~\cite{blelloch1997practical}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{parallel_weak_scalability.png}
+\caption{The parallel application exhibits a very poor weak scalability.}
+\label{fig:empirical_weak_scalability}
+\end{figure}
+
 
 
 \appendix
@@ -720,19 +812,22 @@ and each body is defined by: mass, initial $(x, y, z)$ position, and initial $(v
 
 \section[Machine Specifications]{Machine Specifications}
 \label{appendix:machine_specs}
-\begin{tabular}{ll}
-\toprule
-Architecture & x86\_64 \\
-CPU Model & AMD Ryzen 5 5625U with Radeon Graphics (12 threads, 6 cores) \\
-Base/Max Clock & 2.3 GHz / 4.388 GHz \\
-L1 Cache & 192 KiB (6 instances) \\
-L2 Cache & 3 MiB (6 instances) \\
-L3 Cache & 16 MiB (1 instance) \\
-Memory & 8 GB DDR4 \\
-OS & Ubuntu 22.04.5 LTS, 64-bit \\
-Compiler & \texttt{gcc} 11.4.0 with \texttt{-O2} optimization \\
-\bottomrule
-\end{tabular}
+
+\begin{verbatim}
+Architecture       x86_64
+CPU Model          AMD Ryzen 5 5625U
+                   with Radeon Graphics 
+                   (12 threads, 6 cores)
+Base/Max Clock     2.3 GHz / 4.388 GHz
+L1 Cache           192 KiB (6 instances)
+L2 Cache           3 MiB (6 instances)
+L3 Cache           16 MiB (1 instance)
+Memory             8 GB DDR4
+OS                 Ubuntu 22.04.5 LTS, 64-bit
+Compiler           gcc 11.4.0 with
+                   -O2 optimization
+\end{verbatim}
+
 
 \section{Serial Implementation Timing Data}
 \label{appendix:serial_times}
@@ -802,30 +897,121 @@ The profiling command used was:
 \begin{verbatim}
 perf stat ./serial 12800
 \end{verbatim}
-\begin{table}[H]
-\centering
-\label{tab:perf_summary}
-\begin{tabular}{l r}
-\toprule
-\textbf{Metric} & \textbf{Value} \\
-\midrule
-Task-clock & $268.400$ ms \\
-CPU Utilization & $1.000$ CPUs \\
-Context-switches & $933$ ($3.48$/s) \\
-CPU Migrations & $194$ ($0.72$/s) \\
-Page-faults & $316$ ($1.18$/s) \\
-Cycles & $1.165 \times 10^{9}$ ($4.341$ GHz) \\
-Stalled-cycles-frontend & $1.590 \times 10^{6}$ ($0.14\%$ frontend idle) \\
-Instructions & $2.837 \times 10^{9}$ ($2.43$ IPC) \\
-Branches & $1.152 \times 10^{8}$ \\
-Branch-misses & $7.05 \times 10^{7}$ ($0.06\%$ of all branches) \\
-Elapsed time & $268.410$ s \\
-User time & $268.398$ s \\
-System time & $0.002$ s \\
-\bottomrule
-\end{tabular}
-\caption{\texttt{perf} summary for serial execution with $N = 12\,800$.}
-\end{table}
+
+\begin{verbatim}
+ Task-clock (ms)          268.400
+ 
+ CPU Utilization          1.000 CPUs
+
+ Context-switches         933     (3.48/s)
+ 
+ CPU Migrations           194     (0.72/s)
+
+ Page-faults              316     (1.18/s)
+
+ Cycles                   1.165e9 (4.341 GHz)
+
+ Stalled-cycles-frontend  1.590e6
+                          (0.14% frontend idle)
+
+ Instructions             2.837e9 (2.43 IPC)
+
+ Branches                 1.152e8
+
+ Branch-misses            7.05e7
+                         (0.06% of all branches)
+
+ Elapsed time (s)         268.410
+
+ User time (s)            268.398
+
+ System time (s)          0.002
+\end{verbatim}
+
+\section{GCP Experiments Data}
+\label{appendix:gcp_data}
+\subsection{Measurement Methodology}
+The execution and communication times reported in this appendix were measured using the 
+\texttt{MPI\_Wtime()} function, which returns the elapsed wall-clock time in seconds. 
+Specifically, timestamps were recorded immediately before and after the code sections of interest, 
+and their difference was accumulated across iterations.
+For instance, the cumulative time spent in the \texttt{MPI\discretionary{}{}{}Allgatherv} routine was measured as follows:
+\begin{lstlisting}
+t7 = MPI_Wtime();
+MPI_Allgatherv(local_positions, b, MPI_VECTOR, global_positions, recvcounts, displs,MPI_VECTOR, MPI_COMM_WORLD);
+t8 = MPI_Wtime();
+cumul_time_allgatherv3 += t8 - t7;
+\end{lstlisting}
+
+\subsection{Single Fat Instance}
+\begin{verbatim}
+#Proc   ExecTime[s]   CommTime[s]
+1       453.49        0.003
+2       231.26        0.010
+3       146.31        0.012
+4       110.36        0.021
+6       75.06         0.730
+8       56.97         0.017
+10      45.58         0.018
+12      38.38         0.018
+14      33.38         0.020
+16      29.62         0.045
+\end{verbatim}
+
+\subsection{Inter-regional Fat Instances}
+\begin{verbatim}
+#Proc   ExecTime[s]   CommTime[s]
+2       258.13        71.01
+4       190.75        94.97
+6       174.07        109.63
+8       146.50        96.53
+10      131.86        91.55
+12      111.25        77.27
+14      108.22        78.18
+16      81.08         54.74
+\end{verbatim}
+
+\subsection{Intra-regional Thin Instances}
+\begin{verbatim}
+#Proc   ExecTime[s]   CommTime[s]
+4       96.00         2.66
+8       48.58         0.72
+12      32.55         0.56
+\end{verbatim}
+
+\subsection{Inter-regional Thin Instances}
+\begin{verbatim}
+#Proc   ExecTime[s]   CommTime[s]
+4       179.09        83.94
+8       163.20        112.52
+12      213.73        177.08
+16      157.28        129.38
+\end{verbatim}
+
+\subsection{Four-region Thin Instances}
+\begin{verbatim}
+#Proc   ExecTime[s]   CommTime[s]
+4       283.83        187.73
+8       245.79        194.76
+12      303.51        265.88
+16      242.24        213.26
+\end{verbatim}
+
+\subsection{Weak Scalability (Single Fat Instance)}
+\begin{verbatim}
+#Proc   #Bodies   ExecTime[s]
+1       6400      118.98
+2       12800     188.44
+3       19200     276.88
+4       25600     373.24
+6       38400     562.96
+8       51200     749.22
+10      64000     942.11
+12      76800     1154.50
+\end{verbatim}
+
+
+
 
 
 

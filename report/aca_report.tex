@@ -84,20 +84,11 @@
 
 \maketitle %thanks to 'titling' package, this command generates also the 'pretitle' and 'posttitle', the 'preauthor' and 'postauthor' and the 'predate' and 'postdate' and put them in the following order: {\pretitle, \title, \posttitle, \preauthor, \author, \postauthor, \predate, \date, \postdate} (\maketitle has been overwritten in the package)
 \thispagestyle{empty} % It goes after \maketitle and not after \begin{titlingpage} because \maketitle creates a new page and reset that setting.
-
-	\begin{multicols*}{2}
-
-		\begin{abstract}
-			\centering
-			\noindent
-			This report presents a comprehensive overview of the methods, challenges, and potential solutions involved in the development of a modern technical system. The work includes an analysis of the underlying concepts, a review of relevant literature, and an evaluation of current approaches. Emphasis is placed on both theoretical foundations and practical implementation strategies. The results obtained highlight the effectiveness of the chosen methodology and provide a solid basis for future research or application. This abstract serves as a placeholder and should be replaced with a summary specific to the final version of the report.
-		\end{abstract}
-	\newcolumn
-		\centering
-		\noindent
-		\tableofcontents
-	\end{multicols*}
+\begin{abstract}
+This report presents a comprehensive overview of the methods, challenges, and potential solutions involved in the development of a modern technical system. The work includes an analysis of the underlying concepts, a review of relevant literature, and an evaluation of current approaches. Emphasis is placed on both theoretical foundations and practical implementation strategies. The results obtained highlight the effectiveness of the chosen methodology and provide a solid basis for future research or application. This abstract serves as a placeholder and should be replaced with a summary specific to the final version of the report.
+\end{abstract}
 \end{titlingpage}
+\tableofcontents
 
 \thispagestyle{plain}
 %\pagenumbering{arabic}

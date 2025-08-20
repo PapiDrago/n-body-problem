@@ -115,7 +115,7 @@ Alternative approaches that reduce computational complexity are briefly discusse
 \label{sec:intro}
 The N-body problem is a well-known problem in physics and it has several applications ranging from modeling the gravitational interactions in galaxies and solar systems to simulating charged particle dynamics in plasmas and atoms in molecular systems.
 
-Depending on the goal of the analysis, various assumptions can be relaxed or adjusted. In the experiments I conducted, I considered a closed system of $N$ point masses interacting solely through gravitational forces. This assumption is quite reasonable when modeling astronomical systems, especially when the goal is to compute the trajectories of celestial bodies within them. In such systems, the gravitational force dominates due to the extremely large masses involved, allowing other forces to be safely neglected.
+Depending on the goal of the analysis, various assumptions can be relaxed or adjusted. In the experiments conducted, it was considered a closed system of $N$ point masses interacting solely through gravitational forces, while neglecting possible collisions. This assumption is quite reasonable when modeling astronomical systems, especially when the goal is to compute the trajectories of celestial bodies within them. In such systems, the gravitational force dominates due to the extremely large masses involved, allowing other forces to be safely neglected.
 
 Numerous algorithmic solutions have been proposed to address the N-body problem, many of which have been implemented in software to automate the computation of relevant physical quantities.
 
@@ -290,8 +290,6 @@ Since in the experiments conducted $N \gg T$, the factor $T$ will be omitted fro
 
 \subsubsection{Space Complexity}
 The serial algorithm requires storing the masses, the positions, the velocities and the accelerations of the $N$ bodies. Since the kinematic quantities are 3D vectors, each elements corresponds to 3 floating-point values.
-This means the total storage is:
-
 This means the total storage is: %align is a math environment
 \begin{align*}
 &N \ \text{masses} + 3N \ \text{positions} + 3N \ \text{velocities} \\
@@ -308,18 +306,18 @@ which easily fits in memory.
 
 \subsection{Implementation in C}
 \label{subsec:c_impl}
-The conceptual serial algorithm described in the previous subsection was implemented in the C programming language. This choice was primarily motivated by the need to perform detailed profiling of the code. The complete source code is publicly available on the GitHub repository for this project\footnote{\url{https://github.com/PapiDrago/n-body-problem}\label{fn:repo}, file \emph{serial.c}}.
+The conceptual serial algorithm described in the previous subsection was implemented in the C programming language. This choice was primarily motivated by the need to perform detailed profiling of the code. The complete source code is publicly available on the GitHub repository for this project\footnote{\url{https://github.com/PapiDrago/n-body-problem}\label{fn:repo}}(file \emph{serial.c}).
 
 The implementation follows closely the structure of Algorithm~\ref{alg:serial}, with each major step of the simulation (initialization, acceleration computation, velocity update, and position update) mapped to dedicated functions.
 This modular structure facilitates both readability and profiling, enabling the identification of computational bottlenecks.  
 
 It is worth noticing that to represent the physical vector has been used a struct called \emph{vector} which has three fields, each one is of type \emph{double} and corresponds to one of the three vector components.
-In addition the serial application, at the end of each simulation step, prints the positions of all the bodies on a text file. This has been done in order to check qualitatively the resuls and to compare them to those of the MPI parallel application.
+In addition the serial application, at the end of each simulation step, prints the positions of all the bodies on a text file. This has been done in order to check qualitatively the results and to compare them to those of the MPI parallel application.
 
 \subsubsection{Testing}
 Testing was performed qualitatively, leveraging the physical laws embedded in the program’s functions and the results discussed in Subsection~\ref{subsec:num_int} regarding symplectic numerical integrators, which ensure long-term stability of the simulated system.
 
-For this purpose, a slightly modified version of the serial application (\emph{serial\_testing.c}), adapted from~\cite{wiki:n_body}, was used. This variant allows the user to configure simulation parameters, including the number of bodies, the time-step size, and all initial quantities for each body (mass, position, and velocity), via a plain-text input file. The exact file format is documented in the \emph{README.md} of the remote repository.
+For this purpose, a slightly modified version of the serial application (\emph{serial\_testing.c}), adapted from~\cite{wiki:n_body}, was used. This variant allows the user to configure simulation parameters, including the number of bodies, the time-step size, and all initial quantities for each body (mass, position, and velocity), via a plain-text input file. The exact file format is documented in Appendix~\ref{appendix:solar_params}.
 
 The application produces an output text file containing the positions of all bodies at each time step. This output was then processed by a Python script (\emph{animate\_nbody\_2d.py}) to generate a 2D animation, enabling a qualitative verification of the trajectories and overall behavior of the simulated system.
 
@@ -329,7 +327,7 @@ The simulation confirmed the expected physical behavior:
 \begin{itemize}
     \item the massive body remained essentially stationary due to its large inertia,
     \item the lighter body followed a closed orbit (elliptical in this specific setup),
-    \item the lighter body’s speed increased when it was closer to the massive body, in agreement with Kepler's second law.
+    \item the lighter body’s speed increased when it was closer to the massive body, in agreement with Equation~\eqref{eq:gravitation}.
 \end{itemize}
 
 \begin{figure}[H]
@@ -369,8 +367,8 @@ double rand_uniform(unsigned int *seed, double min, double max) {
     return min + (max - min) * ((double)rand_r(seed) / RAND_MAX);
 }
 \end{lstlisting}
-Using a seed allows to have random reproducible inizializations since a seed determines the beginning of the pseudo-random sequence of values and furthermore the calling of \emph{rand\_r(seed)} ensures that each different processes who may running the application use the same seed. The latter will be crucial when comparing the results with the parallel application.
-Please also notice that in \emph{rand\_uniform} function we also normalize what \emph{rand\_r(seed)} returns and bounds that number to an arbitrary range and that RNG values are drawn from an uniform distribution in order to avoid directional or positional biases.
+Using a seed allows to have random reproducible inizializations since a seed determines the beginning of the pseudo-random sequence of values. Calling of \texttt{rand\_r(seed)} ensures that each different process who may running the application uses the same seed because it is a thread-safe operation. This will be crucial when comparing the results with the parallel application.
+Please also notice that in \texttt{rand\_uniform} function, the value returned by \texttt{rand\_r(seed)} is normalized and bounded to an arbitrary range, and that RNG values are drawn from an uniform distribution in order to avoid directional or positional biases.
 
 In our experiments the interval $\left(-1.0, 1.0\right)$ has been forced to focus on the gravitational interaction.
 
@@ -458,7 +456,7 @@ This means that a priori a linear speedup is expected: doubling the number of CP
     \caption{Speedup as a function of the number of CPUs.}
     \label{fig:linear_speedup}
 \end{figure}
-However, this scenario is too optimistic to be true — and indeed it would only occur if communication among the processes were instantaneous. To be clear if we assign to each CPU (process) a single mass, in order for each process to compyte the acceleration for its own mass it is necessary to know where the other masses are located. Hence each process has to communicate the other the position and this takes time.
+However, this scenario is too optimistic to be true — and indeed it would only occur if communication among the processes were instantaneous. To be clear if we assign to each CPU (process) a single mass, in order for each process to compute the acceleration for its own mass it is necessary to know where the other masses are located. Hence each process has to communicate to the others the position, and this takes time.
 
 \section{Parallel Algorithm}
 \subsection{Conceptual Design}
@@ -562,8 +560,9 @@ Theoretically, the strong scalability of the parallel N-Body algorithm is ideal,
 The last equation highlights the fact in this case (direct-method N-body implementation) since there is no inherently sequential part as concluded in Subsection~\ref{subsec:apriori_parallelism}, analyzing strong scalability is essentially equivalent to analyzing speedup.
 
 \paragraph{Weak Scalability.}
-Weak scalability measures how the execution time changes when the number of processes $P$ increases while keeping the \emph{per-process workload} fixed.  
-Since the per-process workload is $\tfrac{N_p}{P} = N_1$, the scalability formula becomes
+Weak scalability measures how the execution time changes when the number of processes $P$ increases while keeping the \emph{per-process data workload} fixed.  
+In this case the number of bodies assigned to each process remains constant when $P$ increases, thus it is possible to write $\tfrac{N_p}{P} = N_1$.  
+Rearranging the scalability expression gives
 \[
 Scalability_{\text{weak}}(P) = \frac{N_1^2}{(P N_1)^2} \, P = \frac{1}{P}.
 \]
@@ -571,10 +570,11 @@ Scalability_{\text{weak}}(P) = \frac{N_1^2}{(P N_1)^2} \, P = \frac{1}{P}.
 This shows that the presented parallel N-Body algorithm exhibits poor weak scalability.  
 Ideally, increasing both the number of bodies $N$ and the number of processes $P$ in the same ratio should maintain the execution time constant, i.e.\ $Scalability_{\text{weak}}(P) = 1$.  
 However, this is not the case here: if both $N$ and $P$ are doubled, each process is still responsible for the same number of bodies as before, but the inner loop of the \texttt{compute\discretionary{}{}{}Accelerations()} routine must iterate over all $N$ bodies.  
-This can also be seen directly from the per-process time complexity $O\!\left(\tfrac{N^2}{P}\right)$: doubling both $N$ and $P$ results in a doubling of the per-process time.
+This can also be seen directly from the per-process computational complexity $O\!\left(\tfrac{N^2}{P}\right)$: doubling both $N$ and $P$ results in a doubling of the per-process execution time.
 
-As a consequence, the per-process workload grows with $P$, and the overall execution time of the parallel algorithm increases rather than staying constant.  
+As a consequence, although the \emph{data workload} per process is constant, the \emph{computational workload} grows with $P$, and the overall execution time of the parallel algorithm increases rather than staying constant.  
 This is an inherent limitation of the direct method formulation in the N-Body problem.
+
 
 
 \subsection{MPI Implementation}
@@ -629,8 +629,9 @@ The array \emph{displs} is used to ensure that the receiving buffer \emph{global
 More precisely, the value at index $i$ indicates the starting position in the receiving buffer where the block of elements broadcast by the process of rank $i$ will be placed. The displacement depends on both the number of elements contributed by each process and the rank order.
 The following code shows how both \emph{recvcounts} and \emph{displs} are populated:
 \begin{lstlisting}
+/**q = bodies / size, r = bodies % size;**/
 void computeAllGathervParams(int* recvcounts, int* displs, int size, int q, int r) {
-  for (int i = 0; i < size; i++) { /**q = bodies / size, r = bodies % size;**/
+  for (int i = 0; i < size; i++) {
       if (i < r) {
          recvcounts[i] = q + 1;
          displs[i] = i * (q + 1);
@@ -677,6 +678,7 @@ To practically compare the results a simple C program (\texttt{tester.c}) has be
 When it runs it opens both the output files of the serial and the parallel applications and checks value by value if they are equal within a tolerance introduced to allow the comparison between machines with different floating-point precisions.
 
 \subsection{Experimental Evaluation on GCP}
+\label{subsec:gcp_experiments}
 In order to analyze the performance of the MPI implementation, it was necessary not only to rely on a multi-core architecture capable of running multiple processes concurrently, but also to distribute these processes across different machines in order to assess the impact of inter-process communication through MPI functions—in this case, \texttt{MPI\_Allgatherv}.  
 
 To meet both requirements, multiple virtual instances were deployed on the Google Cloud Platform (GCP), using the Compute Engine service~\cite{gcp_compute}, which allows the creation and execution of virtual machines on Google’s infrastructure.
@@ -744,7 +746,7 @@ When processes are distributed across geographically distant regions, the overal
 \end{figure}
 
 \subsubsection{Weak Scalability Analysis}
-As proved in Subsection~\ref{subsec:theoretical_scalability}, the per-process workload grows with $P$, thus the overall execution time of the parallel application increases rather than staying constant.
+As proved in Subsection~\ref{subsec:theoretical_scalability}, the computational workload grows with $P$, thus the overall execution time of the parallel application increases rather than staying constant.
 Rearraging equation~\ref{eq:scalability} we obtain:
 \begin{equation}
 t_{parallel}(P) = P\times t_{parallel}(1)
@@ -753,7 +755,7 @@ Hence, when doubling both the number of processes and the number of bodies, the 
 Further consideration of other configurations beyond the single fat instance is unnecessary, because the weak scalability performance can only worsen due to the communication overhead.
 
 Unfortunately, this is an inherent limitation of the direct method formulation in the N-Body problem.
-The simplest way to improve weak scalability is to relax the physics by neglecting the influence of distant (non-local) bodies. This reduces the inner loop (Algorithm~\ref{alg:parallel_inner_loop} complexity to $O((\frac{N}{P})^2)$ which would make constant the per-process workload.
+The simplest way to improve weak scalability is to relax the physics by neglecting the influence of distant (non-local) bodies. This reduces the inner loop (Algorithm~\ref{alg:parallel_inner_loop}) complexity to $O((\frac{N}{P})^2)$ which would make constant the per-process computational workload.
 
 More scalable approaches involve switching to approximate or hierarchical algorithms such as Barnes–Hut or Particle Mesh, which reduce the computational complexity from $O(N^2)$ to $O(N \log N)$ or even $O(N)$, while maintaining acceptable physical accuracy. For a practical comparison of these techniques, see Blelloch and Narlikar~\cite{blelloch1997practical}.
 
@@ -904,7 +906,8 @@ The profiling command used was:
 \begin{verbatim}
 perf stat ./serial 12800
 \end{verbatim}
-
+Running this command executes the serial version of the program with $N = 12\,800$ bodies and produces a performance summary directly on the terminal.  
+The main statistics collected by \texttt{perf stat} are reported below.
 \begin{verbatim}
  Task-clock (ms)          268.400
  
@@ -938,7 +941,7 @@ perf stat ./serial 12800
 \section{GCP Experiments Data}
 \label{appendix:gcp_data}
 \subsection{Measurement Methodology}
-The execution and communication times reported in this appendix were measured using the 
+The execution and communication times reported in this appendix and used to generate the figures in Subsection~\ref{subsec:gcp_experiments} were measured using the 
 \texttt{MPI\_Wtime()} function, which returns the elapsed wall-clock time in seconds. 
 Specifically, timestamps were recorded immediately before and after the code sections of interest, 
 and their difference was accumulated across iterations.

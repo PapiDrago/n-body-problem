@@ -74,18 +74,14 @@
 \begin{itemize}
 	\item N-Body problem is a well known problem in physics.
 	\item Assumptions:
-	\begin{itemize}
-		\item Closed system containing $N$ point masses (bodies).
-		\item No collisions.
-		\item Gravitational interaction only $\Rightarrow \vec{F}_{i,j}=G\frac{m_{i} m_{j}}{\|\vec{r}_{i}-\vec{r}_{j}\|^3}(\vec{r}_{j}-\vec{r}_{i})$.
-	\end{itemize}
+	\item Celestial Mechanics: trajectories of massive bodies.
 	\item A closed-form solution does not exist\footnote{Douglas C. Heggie, \emph{The Classical Gravitational N-Body Problem}, arXiv:astro-ph/0503600 (2005).}.
-	\item Numerical solution: solving equations of motion at each time step $k$.	
+	\item Numerical solution (direct method): solving equations of motion at each time step $k$.	
 \end{itemize}
 \end{frame}
 
 \section{Physical Model}
-\begin{frame}{Physical Model}
+\begin{frame}{Physical Model (Equations of Motion)}
 Underlying physics:
 \begin{itemize}
 	\item $\vec{F}_{i,j}=G\frac{m_{i} m_{j}}{\|\vec{r}_{i}-\vec{r}_{j}\|^3}(\vec{r}_{j}-\vec{r}_{i})$ (Gravitational universal law).
@@ -97,26 +93,15 @@ Underlying physics:
 \begin{itemize}
 	\item $\vec{a}_i=\sum_{\substack{j=0 \\ j \neq i}}^{N-1}\left[G\frac{m_j}{\|\vec{r}_i-\vec{r}_j\|^3}(\vec{r}_j-\vec{r}_i)\right]$ (Acceleration of body $i$).
 	\item $\vec{v}_i(t_k) = \vec{v}_i(t_{k-1}) + \int_{t_{k-1}}^{t_k} \vec{a}_i(\tau)\, d\tau \Rightarrow \vec{v}_{k+1}=\vec{v}_k+\vec{a}_k\Delta t$.
-	\item $\vec{r}_i(t_k) = \vec{r}_i(t_{k-1}) + \int_{t_{k-1}}^{t_k} \vec{v}_i(\tau)\, d\tau \Rightarrow \vec{r}_{k+1}=\vec{r}_k+\vec{v}_k\Delta t$.
+	\item $\vec{r}_i(t_k) = \vec{r}_i(t_{k-1}) + \int_{t_{k-1}}^{t_k} \vec{v}_i(\tau)\, d\tau \Rightarrow \vec{r}_{k+1}=\vec{r}_k+\vec{v}_{k+1}\Delta t$.
 \end{itemize}
 Direct method approach: expensive but more intuitive.
 \end{frame}
 
-\begin{frame}{Numerical Integration}
-Not all numerical integration methods are good:
-\begin{itemize}
-	\item The exact velocity $v(t_{k+1})$ is: $v(t_k+\Delta t) = v(t_k) + a(t_k)\,\Delta t
-+ \frac{\Delta t^2}{2} \frac{d^2 v}{dt^2}(\xi), \xi \in \left[ t_k,\, t_k+\Delta t \right]$
-Step size $\Delta t$ weighs trade-off between accuracy and computational cost.
-	\item Energy drift: $K_{TOT}(t_k) = \frac{1}{2} \sum_{i=0}^{N-1}m_iv_i^2(t_k)$
-	\\Geometrical structure of the trajectories is not retained.
-\end{itemize}
-Symplectic methods prevent energy drift\footnote{R.~D.~Engle, “Monitoring energy drift with shadow Hamiltonians,” \emph{Journal of Computational Physics}, vol. 210, no. 2, pp. 371–384, 2005.} $\Rightarrow$ Semi-implicit Euler method: $\vec{r}_{k+1}=\vec{r}_k+\textcolor{red}{\vec{v}_{k+1}} \, \Delta t$
-\end{frame}
-
 \section{Serial Algorithm}
 \begin{frame}{Serial Algorithm (Direct Method)}
-Conceptual design of the serial algorithm
+Conceptual design of the serial algorithm:
+three routines for computing the three equation of motions.
 \begin{algorithm}[H]
 \caption{Serial N-body algorithm (direct method)}
 \label{alg:serial}
@@ -129,11 +114,9 @@ Conceptual design of the serial algorithm
 \EndFor
 \end{algorithmic}
 \end{algorithm}
-Space complexity:
-$N \ \text{masses} + 3N \ \text{positions} + 3N \ \text{velocities} + 3N \ \text{accelerations} = 10N \ \text{real values} \Rightarrow O(N)$ 
 \end{frame}
 
-\begin{frame}{Serial Algorithm (Direct Method)}
+\begin{frame}{Serial Algorithm (\texttt{computeAcceleration})}
 \begin{algorithm}[H]
 \caption{Inner loop: compute accelerations (direct method)}
 \label{alg:inner_loop}
@@ -156,59 +139,11 @@ $N \ \text{masses} + 3N \ \text{positions} + 3N \ \text{velocities} + 3N \ \text
 
 
 
-\begin{frame}[fragile]{C Implementation}{}
-Each major step of the Serial Algorithm mapped to a dedicated function.
-
-\begin{lstlisting}[style=nbody]
-void computePositions(int bodies, double dt){
-  for (int i=0; i<bodies; ++i)
-    positions[i] += dt * velocities[i]; }
-\end{lstlisting}
-
-\vspace{2mm}
-
-\begin{lstlisting}[style=nbody]
-void computeAccelerations(int bodies) {
-    const double epsilon = 1e-5;
-    for (int i = 0; i < bodies; i++) {
-        accelerations[i] = 0.0;
-        for (int j = 0; j < bodies; j++) {
-            if (i != j) {
-                double dist = positions[j] - positions[i] + epsilon;
-                double invDistCubed = 1.0 / (dist * dist * dist);
-                double scalar = GravConstant * masses[j] * invDistCubed;
-                accelerations[i] += scalar * dist;            }
-        }
-    }
-}
-\end{lstlisting}
-
-\end{frame}
 
 \begin{frame}[fragile]{C Implementation: Profiling}
 \centering
 
-% --- Top row: two plots side by side ---
-\begin{columns}[T,onlytextwidth]
-  \column{0.5\textwidth}
-  \centering
-  \includegraphics[width=0.6\linewidth]{logex_time_vs_logbodies.png}\\[1mm]
-  {\footnotesize \textbf{Log–log:} execution time vs.\ bodies; power-law behavior.}
-
-  \column{0.5\textwidth}
-  \centering
-  \includegraphics[width=0.6\linewidth]{ex_time_vs_bodies.png}\\[1mm]
-  {\footnotesize \textbf{Linear:} execution time as a function of $N$.}
-\end{columns}
-
-\vspace{3mm}
-\hrule % horizontal line separating plots from tables
-\vspace{3mm}
-
 % --- Bottom row: two verbatim blocks side by side with vertical line ---
-\noindent
-\begin{minipage}[t]{0.48\textwidth}
-{\tiny
 \begin{verbatim}
 gprof Flat profile:
 
@@ -224,42 +159,17 @@ Each sample counts as 0.01 seconds.
   0.00   0.00   100   simulate
   0.00   0.00     1   initiateSystem
 \end{verbatim}
-}
-\end{minipage}%
-\hfill
-\vrule width0.5pt % vertical separator
-\hfill
-\begin{minipage}[t]{0.48\textwidth}
-{\tiny
-\begin{verbatim}
- perf counter stats:
-
- Task-clock (ms)          268.400
- CPU Utilization          1.000 CPUs
-
- Cycles                   1.165e9 (4.341 GHz)
- Stalled-cycles-frontend  1.590e6
-                          (0.14% frontend idle)
-
- Instructions             2.837e9 (2.43 IPC)
- Branches                 1.152e8
- Branch-misses            7.05e7
-                         (0.06% of all branches)
-\end{verbatim}
-}
-\end{minipage}
 
 \end{frame}
 
 \begin{frame}{C Implementation (A-priori Study of Available Parallelism)}
 \begin{itemize}
-  \item Amdahl's law (theoretical speedup):
+	\item Amdahl's law (theoretical speedup):
 \end{itemize}
 
 \[
 Speedup(N) = \frac{S+P}{S + \tfrac{P}{N}}
 \]
-
 \begin{itemize}
   \item For \texttt{computeAcceleration}: no loop-carried dependency. \\
         $\Rightarrow S=0,\; P=1$
@@ -270,26 +180,8 @@ Speedup(N) = \frac{S+P}{S + \tfrac{P}{N}}
 
 \section{MPI Parallel Implementation}
 
-\begin{frame}{MPI Parallel Implementation (Conceptual Design)}
-\begin{algorithm}[H]
-\caption{Parallel N-body (single-process view)}
-\label{alg:parallel}
-\begin{algorithmic}[1]
-\State Initialize local positions, local velocities, and local masses
-\State Send local positions and local masses
-\State Wait for global positions and global masses
-\For{each time step}
-    \State Compute local accelerations (Algorithm~\ref{alg:parallel_inner_loop})
-    \State Update local velocities
-    \State Update local positions
-    \State Send local positions
-    \State Wait for global positions
-\EndFor
-\end{algorithmic}
-\end{algorithm}
-\end{frame}
-
-\begin{frame}{MPI Parallel Implementation (Conceptual Design)}
+\begin{frame}{MPI Parallel Implementation (Domain Decomposition)}
+Each process takes care of $\frac{N}{P}$ bodies.
 \begin{algorithm}[H]
 \caption{Parallel inner loop: compute local accelerations}
 \label{alg:parallel_inner_loop}
@@ -305,6 +197,31 @@ Speedup(N) = \frac{S+P}{S + \tfrac{P}{N}}
   \EndFor
 \EndFor
 \Statex \textbf{Time complexity (per process):} $O\!\left(\frac{N}{P} \cdot N\right) = O\!\left(\frac{N^2}{P}\right)$
+\end{algorithmic}
+\end{algorithm}
+\end{frame}
+
+
+
+
+
+
+\begin{frame}{MPI Parallel Implementation (Communication)}
+All processes need \textbf{all positions} to compute local accelerations. They need to communicate.
+\begin{algorithm}[H]
+\caption{Parallel N-body (single-process view)}
+\label{alg:parallel}
+\begin{algorithmic}[1]
+\State Initialize local positions, local velocities, and local masses
+\State Send local positions and local masses
+\State Wait for global positions and global masses
+\For{each time step}
+    \State Compute local accelerations (Algorithm~\ref{alg:parallel_inner_loop})
+    \State Update local velocities
+    \State Update local positions
+    \State Send local positions
+    \State Wait for global positions
+\EndFor
 \end{algorithmic}
 \end{algorithm}
 \end{frame}
@@ -326,34 +243,6 @@ MPI_Allgatherv(
         (via \texttt{displs} offsets).
   \item \textbf{Blocking:} no process continues until all have finished exchanging data.
 \end{itemize}
-\end{frame}
-
-
-
-\begin{frame}[fragile]{MPI Parallel Implementation (Initialization and Testing)}
-\begin{itemize}
-  \item Random initialization: seed depends on the \textbf{global index} of each body.  
-        $\Rightarrow$ mirrors the serial version’s indexing scheme.
-  \item Enables a \textbf{direct comparison} of serial vs.\ parallel output.
-\end{itemize}
-
-\vspace{2mm}
-
-\textbf{Compute global start index (per process):}
-\begin{lstlisting}[style=nbody]
-unsigned int global_start_index(int r, int bodies, int rank) {
-    if (rank < r) {
-        return rank * (bodies + 1);
-    } else {
-        return r * (bodies + 1) + (rank - r) * bodies;
-    }
-}
-\end{lstlisting}
-
-\textbf{Seed formula:}
-\begin{lstlisting}[style=nbody]
-unsigned int seed = start_index + i;
-\end{lstlisting}
 \end{frame}
 
 \section{Performance Evaluation on GCP}

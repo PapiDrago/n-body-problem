@@ -73,7 +73,6 @@
 \begin{frame}{Introduction}
 \begin{itemize}
 	\item N-Body problem is a well known problem in physics.
-	\item Assumptions:
 	\item Celestial Mechanics: trajectories of massive bodies.
 	\item A closed-form solution does not exist\footnote{Douglas C. Heggie, \emph{The Classical Gravitational N-Body Problem}, arXiv:astro-ph/0503600 (2005).}.
 	\item Numerical solution (direct method): solving equations of motion at each time step $k$.	
@@ -101,7 +100,7 @@ Direct method approach: expensive but more intuitive.
 \section{Serial Algorithm}
 \begin{frame}{Serial Algorithm (Direct Method)}
 Conceptual design of the serial algorithm:
-three routines for computing the three equation of motions.
+three routines for computing the three equations of motion.
 \begin{algorithm}[H]
 \caption{Serial N-body algorithm (direct method)}
 \label{alg:serial}
@@ -146,8 +145,6 @@ three routines for computing the three equation of motions.
 % --- Bottom row: two verbatim blocks side by side with vertical line ---
 \begin{verbatim}
 gprof Flat profile:
-
-Each sample counts as 0.01 seconds.
 
   %   self  seconds  calls   name
  98.49 150.54   100   computeAccelerations
